@@ -6,6 +6,6 @@ let sqrt n =
     find_sqrt(k + 1)
   in 
 if n < 0
-  then failwith "Invalid Input"
+  then failwith "Invalid Input" (*From Chapter 3.10*)
 else
   find_sqrt 0
