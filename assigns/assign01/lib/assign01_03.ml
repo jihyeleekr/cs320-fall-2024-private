@@ -8,6 +8,3 @@ let nth (s: int) (i : int) : int =
   in
   if s < 0 then failwith "Invalid input for s"
   else is_div s x 0
-;;
-
-nth 1058400 0;;
