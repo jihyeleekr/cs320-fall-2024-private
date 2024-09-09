@@ -1,14 +1,20 @@
 open Assign01_03
-let to_string (n : int) : string =
-  let s = [] @ [string_of_int (nth n 2)] in
+let to_string (s : int) : string =
+  let rec generate_sequence s i seq = (* Return the number sequences in list form: contains int*)
+    let count = nth s i in 
+    if count = 0 then List.rev seq (* Reverse the list *)
+    else generate_sequence s (i + 1) (count :: seq)
+  in 
+  let seq_list = generate_sequence s 0 [] in
+  
   let list_to_string lst = 
-    let rec aux lst = 
-      match lst with 
+    let rec aux lst = (* Take the list elements and convert it into string *)
+      match lst with
       | [] -> ""
-      | [x] -> x
-      | x :: xs -> x ^";" ^ aux xs
+      | [x] -> string_of_int x (* Convert the int element to String *)
+      | x :: xs -> string_of_int x ^ "; " ^ aux xs
     in
-    "[" ^ aux lst ^ "]"
+    "[" ^ aux lst ^ "]" (* Add list brackets *)
   in
-  if n < 0 then failwith "Invalid input for n"
-  else list_to_string s
+  if s < 0 then failwith "Invalid input for n"
+  else list_to_string seq_list
