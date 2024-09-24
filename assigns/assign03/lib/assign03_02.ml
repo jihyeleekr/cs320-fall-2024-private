@@ -1,19 +1,21 @@
 let gen_fib (l : int list) (n : int) : int =
   let k = List.length l in
-  if k = 0 || n < 0 then failwith "Invalid Inputs.";
-  let rec accum (lst : int list) (k : int) : int = 
+
+  let rec sum (lst : int list) (k : int) (acc : int) : int =
     match lst, k with
-    | [], _ -> 0
-    | _, 0 -> 0
-    | h::t, k -> h + (accum t (k - 1))
+    | [], _ -> acc
+    | _, 0 -> acc
+    | h :: t, k -> sum t (k - 1) (acc + h)
   in
 
-  let rec fib (lst : int list) (i : int) : int = 
-    match lst with
-    | [] -> failwith "Invalid input for l"
-    | h::_ when i = n -> h
-    | _ ->
-      let next_val = accum lst k in
-      fib (next_val::lst) (i + 1)
-    in
-    fib (List.rev l) k                            
+  let rec fib (lst : int list) (idx : int) : int =
+    match idx with
+    | _ when idx < n -> 
+      let next_val = sum lst k 0 in
+      fib (next_val :: lst) (idx + 1)
+    | _ -> List.nth lst 0
+  in
+
+  fib (List.rev l) (k - 1)
+
+
