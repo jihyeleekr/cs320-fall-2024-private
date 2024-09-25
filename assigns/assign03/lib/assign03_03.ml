@@ -29,5 +29,4 @@ let rec collapse h t =
     if h = 1 then
       Node (connect (List.map terminal_elements children))
     else
-      (* Recursively collapse each child node *)
       Node (List.map (collapse (h - 1)) children)
