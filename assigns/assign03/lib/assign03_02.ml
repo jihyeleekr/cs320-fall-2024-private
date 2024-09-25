@@ -1,3 +1,4 @@
+
 let gen_fib (l : int list) (n : int) : int =
   let k = List.length l in
 
@@ -13,7 +14,7 @@ let gen_fib (l : int list) (n : int) : int =
     | _ when idx < n -> 
       let next_val = sum lst k 0 in
       fib (next_val :: lst) (idx + 1)
-    | _ -> List.nth lst 0
+    | _ ->  List.nth (List.rev lst) n
   in
 
   fib (List.rev l) (k - 1)
