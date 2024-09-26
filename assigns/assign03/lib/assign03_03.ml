@@ -1,32 +1,32 @@
 type tree = 
   | Leaf of int
   | Node of tree list
-let rec connect lsts =
-  match lsts with
-  | [] -> []
-  | l :: ls -> l @ connect ls
-let rec height t =
-  match t with
-  | Leaf _ -> 0
-  | Node cs ->
-    let rec max_depth cs =
-      match cs with
-      | [] -> -1
-      | c :: cs -> max (height c) (max_depth cs)
-    in 1 + max_depth cs
-
-let rec terminal_elements t =
-  match t with
-  | Leaf _ -> [t]
-  | Node [] -> [t]
-  | Node children -> connect (List.map terminal_elements children)
 
 let rec collapse h t =
-  if h = 0 then t
-  else match t with
+  let rec collapse_children h children =
+    match children with
+    | [] -> []
+    | c :: rest ->
+      let collapsed_child =
+        match c with
+        | Leaf _ -> c
+        | Node [] -> if h <= 0 then Node [] else c
+        | _ -> collapse (h - 1) c
+      in collapsed_child :: collapse_children h rest
+  in
+  match t with
   | Leaf _ -> t
+  | Node [] -> if h <= 0 then Node [] else t
   | Node children ->
-    if h = 1 then
-      Node (connect (List.map terminal_elements children))
+    if h <= 1 then
+      let rec terminal_children children =
+        match children with
+        | [] -> []
+        | Leaf _ as l :: rest -> l :: terminal_children rest
+        | Node [] as n :: rest -> n :: terminal_children rest
+        | Node subchildren :: rest ->
+          terminal_children subchildren @ terminal_children rest
+      in Node (terminal_children children)
     else
-      Node (List.map (collapse (h - 1)) children)
+      Node (collapse_children h children)
+
