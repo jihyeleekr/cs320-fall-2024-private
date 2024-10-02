@@ -1,26 +1,27 @@
 
-let calculate_lifespan f s p =
-  let rec aux current_s count =
-    if p current_s then count  
-    else aux (f current_s) (count + 1)  
-  in
-  aux s 0  
-
 let last_function_standing funcs start pred =
-  let rec find_max_lifespan funcs current_max_f current_max_lifespan tied_count =
+  let rec eliminate funcs longest_f longest_survivor step_count =
     match funcs with
-    | [] -> 
-      if tied_count > 1 then None  
-      else current_max_f  
+    | [] ->
+      if step_count = 1 then longest_f  
+      else None  
     | f :: rest ->
-      let lifespan = calculate_lifespan f start pred in  
-      if lifespan > current_max_lifespan then
-        find_max_lifespan rest (Some f) lifespan 1
-      else if lifespan = current_max_lifespan then
-        find_max_lifespan rest current_max_f current_max_lifespan (tied_count + 1)
+      let rec step_function f current_state steps =
+        if pred current_state then steps  
+        else step_function f (f current_state) (steps + 1)
+      in
+      let steps = step_function f start 0 in
+      if steps > longest_survivor then
+        eliminate rest (Some f) steps 1
+      else if steps = longest_survivor then
+        eliminate rest longest_f longest_survivor (step_count + 1)
       else
-        find_max_lifespan rest current_max_f current_max_lifespan tied_count
+        eliminate rest longest_f longest_survivor step_count
   in
-  find_max_lifespan funcs None (-1) 0  
+  eliminate funcs None (-1) 0  
+
+
+
+
 
 
