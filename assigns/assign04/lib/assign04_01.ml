@@ -1,27 +1,35 @@
-
 let last_function_standing funcs start pred =
-  let rec eliminate funcs longest_f longest_survivor step_count =
+  let rec step funcs states =
     match funcs with
-    | [] ->
-      if step_count = 1 then longest_f  
-      else None  
-    | f :: rest ->
-      let rec step_function f current_state steps =
-        if pred current_state then steps  
-        else step_function f (f current_state) (steps + 1)
+    | [] -> None
+    | [f] -> Some f
+    | _ ->
+      let rec process_funcs funcs states survivors new_states =
+        match funcs, states with
+        | [], [] -> (survivors, new_states)
+        | f :: fs_rest, state :: st_rest ->
+          let new_state = f state in
+          if pred new_state then
+            process_funcs fs_rest st_rest survivors new_states
+          else
+            process_funcs fs_rest st_rest (f :: survivors) (new_state :: new_states)
+        | _ -> (survivors, new_states)
       in
-      let steps = step_function f start 0 in
-      if steps > longest_survivor then
-        eliminate rest (Some f) steps 1
-      else if steps = longest_survivor then
-        eliminate rest longest_f longest_survivor (step_count + 1)
-      else
-        eliminate rest longest_f longest_survivor step_count
+      let (survivors, new_states) = process_funcs funcs states [] [] in
+      match survivors with
+      | [] -> None
+      | [f] -> Some f
+      | _ ->
+        let rec reverse lst acc =
+          match lst with
+          | [] -> acc
+          | h :: t -> reverse t (h :: acc)
+        in
+        step (reverse survivors []) (reverse new_states [])
   in
-  eliminate funcs None (-1) 0  
-
-
-
-
-
-
+  let rec initialize_states funcs start acc =
+    match funcs with
+    | [] -> acc
+    | _ :: rest -> initialize_states rest start (start :: acc)
+  in
+  step funcs (initialize_states funcs start [])
