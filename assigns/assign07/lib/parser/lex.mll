@@ -32,7 +32,7 @@ rule read =
   | ")"           { RPAREN }
   | "true"        { TRUE }
   | "false"       { FALSE }
-  | "()"          { UNIT }  (* Use the UNIT token *)
+  | "()"          { UNIT }  
   | num           { NUM (int_of_string (Lexing.lexeme lexbuf)) }
   | var           { VAR (Lexing.lexeme lexbuf) }
   | whitespace    { read lexbuf }  
