@@ -26,11 +26,6 @@ expr:
   | IF cond = expr THEN e1 = expr ELSE e2 = expr { If(cond, e1, e2) }
   | LET var = VAR EQ value = expr IN body = expr { Let(var, value, body) }
   | FUN arg = VAR ARROW body = expr { Fun(arg, body) }
-  | app { $1 }
-;
-
-app:
-  | e1 = app e2 = simple_expr { App(e1, e2) }
   | or_expr { $1 }
 ;
 
@@ -61,9 +56,14 @@ add_expr:
 ;
 
 mult_expr:
-  | e1 = mult_expr TIMES e2 = simple_expr { Bop(Mul, e1, e2) }
-  | e1 = mult_expr DIVIDE e2 = simple_expr { Bop(Div, e1, e2) }
-  | e1 = mult_expr MOD e2 = simple_expr { Bop(Mod, e1, e2) }
+  | e1 = mult_expr TIMES e2 = app { Bop(Mul, e1, e2) }
+  | e1 = mult_expr DIVIDE e2 = app { Bop(Div, e1, e2) }
+  | e1 = mult_expr MOD e2 = app { Bop(Mod, e1, e2) }
+  | app { $1 }
+;
+
+app:
+  | e1 = app e2 = simple_expr { App(e1, e2) }
   | simple_expr { $1 }
 ;
 
