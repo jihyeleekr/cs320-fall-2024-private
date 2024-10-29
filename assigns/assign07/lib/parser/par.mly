@@ -8,7 +8,6 @@ open Utils
 %token PLUS MINUS TIMES DIVIDE MOD LTE LT GTE GT EQ NEQ AND OR
 %token TRUE FALSE LPAREN RPAREN EOF UNIT
 
-(* Operator precedence and associativity *)
 %right OR
 %right AND
 %left LT LTE GT GTE EQ NEQ
