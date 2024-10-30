@@ -26,7 +26,7 @@ expr:
   | IF cond = expr THEN e1 = expr ELSE e2 = expr { If(cond, e1, e2) }
   | LET var = VAR EQ value = expr IN body = expr { Let(var, value, body) }
   | FUN arg = VAR ARROW body = expr { Fun(arg, body) }
-  | or_expr { $1 }
+  | or_expr { $1 } //https://ocaml.org/manual/5.2/lexyacc.html
 ;
 
 or_expr:
