@@ -19,3 +19,10 @@ open Utils
 
 prog:
   | EOF { Num 0 }
+
+expr:
+  | n = NUM { Num n }
+  | TRUE {True}
+  | FALSE { False}
+  | LPAREN; ADD;  e1 = expr; e2 = expr ;RPAREN { Add (e1, e2)}
+  | LPAREN; EQ; e1 = expr; e2 = expr ; RPAREN { Eq (e1, e2)}
