@@ -5,6 +5,7 @@ open Utils
 %token <int> NUM
 %token <string> VAR
 %token IF THEN ELSE LET IN FUN ARROW
+%token REC  
 %token PLUS MINUS TIMES DIVIDE MOD LTE LT GTE GT EQ NEQ AND OR
 %token TRUE FALSE LPAREN RPAREN EOF UNIT
 
@@ -25,8 +26,9 @@ prog:
 expr:
   | IF cond = expr THEN e1 = expr ELSE e2 = expr { If(cond, e1, e2) }
   | LET var = VAR EQ value = expr IN body = expr { Let(var, value, body) }
+  | LET REC var = VAR EQ value = expr IN body = expr { LetRec(var, value, body) }
   | FUN arg = VAR ARROW body = expr { Fun(arg, body) }
-  | or_expr { $1 } //https://ocaml.org/manual/5.2/lexyacc.html
+  | or_expr { $1 }
 ;
 
 or_expr:

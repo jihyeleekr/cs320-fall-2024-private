@@ -7,7 +7,7 @@ let value_to_expr = function
   | VNum n -> Num n
   | VBool b -> if b then True else False
   | VUnit -> Unit
-  | VFun (arg, body) -> Fun (arg, body)
+  | VFun (arg, body, _) -> Fun (arg, body)
 
 let rec subst (v : value) (x : string) (e : expr) : expr =
   match e with
@@ -15,11 +15,16 @@ let rec subst (v : value) (x : string) (e : expr) : expr =
   | Var y -> if y = x then value_to_expr v else e
   | If (cond, e1, e2) -> If (subst v x cond, subst v x e1, subst v x e2)
   | Let (y, e1, e2) ->
-      if y = x then Let (y, subst v x e1, e2)
-      else Let (y, subst v x e1, subst v x e2)
+      let e1' = subst v x e1 in
+      if y = x then Let (y, e1', e2)
+      else Let (y, e1', subst v x e2)
+  | LetRec (f, e1, e2) ->
+      let e1' = subst v x e1 in
+      LetRec (f, e1', subst v x e2)  
   | Fun (y, body) -> if y = x then e else Fun (y, subst v x body)
   | App (e1, e2) -> App (subst v x e1, subst v x e2)
   | Bop (op, e1, e2) -> Bop (op, subst v x e1, subst v x e2)
+  
 
 let rec eval (e : expr) : (value, error) result =
   match e with
@@ -37,15 +42,21 @@ let rec eval (e : expr) : (value, error) result =
       match eval e1 with
       | Ok v -> eval (subst v x e2)
       | Error err -> Error err)
-  | Fun (arg, body) -> Ok (VFun (arg, body))
+  | LetRec (f, e1, e2) -> (
+      let rec_value = VFun (f, subst (VFun (f, e1, [])) f e1, []) in
+      eval (subst rec_value f e2))
+  | Fun (arg, body) -> Ok (VFun (arg, body, []))  
   | App (e1, e2) -> (
       match eval e1 with
-      | Ok (VFun (arg, body)) -> (
+      | Ok (VFun (arg, body, _)) -> (  
           match eval e2 with
           | Ok v -> eval (subst v arg body)
           | Error err -> Error err)
       | _ -> Error InvalidApp)
   | Bop (op, e1, e2) -> eval_bop op e1 e2
+
+  
+  
 
 and eval_bop op e1 e2 =
   match op, eval e1, eval e2 with
