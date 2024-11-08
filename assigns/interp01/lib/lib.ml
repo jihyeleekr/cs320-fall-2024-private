@@ -18,6 +18,7 @@ let rec subst (v : value) (x : string) (e : expr) : expr =
   | Fun (y, body) -> if y = x then e else Fun (y, subst v x body)
   | App (e1, e2) -> App (subst v x e1, subst v x e2)
   | Bop (op, e1, e2) -> Bop (op, subst v x e1, subst v x e2)
+
 let rec eval (e : expr) : (value, error) result =
   match e with
   | Num n -> Ok (VNum n)
@@ -43,6 +44,7 @@ let rec eval (e : expr) : (value, error) result =
           | Error err -> Error err)
       | _ -> Error InvalidApp)
   | Bop (op, e1, e2) -> eval_bop op e1 e2
+
 and eval_bop op e1 e2 =
   match op, eval e1, eval e2 with
   | Add, Ok (VNum v1), Ok (VNum v2) -> Ok (VNum (v1 + v2))
@@ -59,7 +61,8 @@ and eval_bop op e1 e2 =
   | And, Ok (VBool b1), Ok (VBool b2) -> Ok (VBool (b1 && b2))
   | Or, Ok (VBool b1), Ok (VBool b2) -> Ok (VBool (b1 || b2))
   | _ -> Error (InvalidArgs op)
+
 let interp (input : string) : (value, error) result =
-  match parse input with
+  match parse input with  
   | Some prog -> eval prog
   | None -> Error ParseFail
