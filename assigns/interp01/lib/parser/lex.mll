@@ -33,9 +33,7 @@ rule read =
   | "true"        { TRUE }
   | "false"       { FALSE }
   | "()"          { UNIT }  
-  | "rec"         { REC }
   | num           { NUM (int_of_string (Lexing.lexeme lexbuf)) }
   | var           { VAR (Lexing.lexeme lexbuf) }
   | whitespace    { read lexbuf }  
   | eof           { EOF }    
-

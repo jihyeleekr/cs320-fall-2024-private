@@ -11,7 +11,6 @@ type expr =
   | Bop of bop * expr * expr
   | If of expr * expr * expr
   | Let of string * expr * expr
-  | LetRec of string * expr * expr
   | Fun of string * expr
 
 type prog = expr
@@ -20,7 +19,7 @@ type value =
   | VNum of int
   | VBool of bool
   | VUnit
-  | VFun of string * expr * (string * value) list 
+  | VFun of string * expr
 
 type error =
   | DivByZero
@@ -35,7 +34,7 @@ let string_of_value = function
   | VBool true -> "true"
   | VBool false -> "false"
   | VUnit -> "()"
-  | VFun (_, _,_) -> "<fun>"
+  | VFun (_,_) -> "<fun>"
 
 let string_of_bop = function
   | Add -> "(+)"
