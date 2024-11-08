@@ -2,7 +2,6 @@ open Utils
 
 let parse = My_parser.parse
 
-
 let value_to_expr = function
   | VNum n -> Num n
   | VBool b -> if b then True else False
@@ -15,12 +14,14 @@ let rec subst (v : value) (x : string) (e : expr) : expr =
   | Var y -> if y = x then value_to_expr v else e
   | If (cond, e1, e2) -> If (subst v x cond, subst v x e1, subst v x e2)
   | Let (y, e1, e2) ->
-      if y = x then Let (y, subst v x e1, e2)
-      else Let (y, subst v x e1, subst v x e2)
-  | Fun (y, body) -> if y = x then e else Fun (y, subst v x body)
+      if y = x then Let (y, subst v x e1, e2)  
+      else Let (y, subst v x e1, subst v x e2)  
+  | Fun (y, body) ->
+      if y = x then e  
+      else Fun (y, subst v x body)
   | App (e1, e2) -> App (subst v x e1, subst v x e2)
   | Bop (op, e1, e2) -> Bop(op, subst v x e1, subst v x e2)
-  
+
 let rec eval (e : expr) : (value, error) result =
   match e with
   | Num n -> Ok (VNum n)
@@ -35,9 +36,9 @@ let rec eval (e : expr) : (value, error) result =
       | _ -> Error InvalidIfCond)
   | Let (x, e1, e2) -> (
       match eval e1 with
-      | Ok v -> eval (subst v x e2) 
+      | Ok v -> eval (subst v x e2)  
       | Error err -> Error err)
-  | Fun (arg, body) -> Ok (VFun (arg, body))
+  | Fun (arg, body) -> Ok (VFun (arg, body))  
   | App (e1, e2) -> (
       match eval e1 with
       | Ok (VFun (arg, body)) -> (
@@ -66,5 +67,5 @@ and eval_bop op e1 e2 =
 
 let interp (input : string) : (value, error) result =
   match parse input with  
-  | Some prog -> eval prog
+  | Some prog -> eval prog  
   | None -> Error ParseFail
