@@ -1,7 +1,6 @@
 open Utils
 
 let parse = My_parser.parse
-
 let value_to_expr = function
   | VNum n -> Num n
   | VBool b -> if b then True else False
@@ -14,11 +13,9 @@ let rec subst (v : value) (x : string) (e : expr) : expr =
   | Var y -> if y = x then value_to_expr v else e
   | If (cond, e1, e2) -> If (subst v x cond, subst v x e1, subst v x e2)
   | Let (y, e1, e2) ->
-      if y = x then Let (y, subst v x e1, e2)  
-      else Let (y, subst v x e1, subst v x e2)  
-  | Fun (y, body) ->
-      if y = x then e  
-      else Fun (y, subst v x body)
+      if y = x then Let (y, subst v x e1, e2)
+      else Let (y, subst v x e1, subst v x e2)
+  | Fun (y, body) -> if y = x then e else Fun (y, subst v x body)
   | App (e1, e2) -> App (subst v x e1, subst v x e2)
   | Bop (op, e1, e2) -> Bop(op, subst v x e1, subst v x e2)
 
@@ -36,14 +33,14 @@ let rec eval (e : expr) : (value, error) result =
       | _ -> Error InvalidIfCond)
   | Let (x, e1, e2) -> (
       match eval e1 with
-      | Ok v -> eval (subst v x e2)  
+      | Ok v -> eval (subst v x e2)
       | Error err -> Error err)
-  | Fun (arg, body) -> Ok (VFun (arg, body))  
+  | Fun (arg, body) -> Ok (VFun (arg, body))
   | App (e1, e2) -> (
       match eval e1 with
       | Ok (VFun (arg, body)) -> (
           match eval e2 with
-          | Ok v -> eval (subst v arg body)  
+          | Ok v -> eval (subst v arg body)
           | Error err -> Error err)
       | _ -> Error InvalidApp)
   | Bop (op, e1, e2) -> eval_bop op e1 e2
@@ -53,8 +50,10 @@ and eval_bop op e1 e2 =
   | Add, Ok (VNum v1), Ok (VNum v2) -> Ok (VNum (v1 + v2))
   | Sub, Ok (VNum v1), Ok (VNum v2) -> Ok (VNum (v1 - v2))
   | Mul, Ok (VNum v1), Ok (VNum v2) -> Ok (VNum (v1 * v2))
-  | Div, Ok (VNum v1), Ok (VNum v2) -> if v2 = 0 then Error DivByZero else Ok (VNum (v1 / v2))
-  | Mod, Ok (VNum v1), Ok (VNum v2) -> if v2 = 0 then Error DivByZero else Ok (VNum (v1 mod v2))
+  | Div, Ok (VNum v1), Ok (VNum v2) -> 
+      if v2 = 0 then Error DivByZero else Ok (VNum (v1 / v2))
+  | Mod, Ok (VNum v1), Ok (VNum v2) -> 
+      if v2 = 0 then Error DivByZero else Ok (VNum (v1 mod v2))
   | Lt, Ok (VNum v1), Ok (VNum v2) -> Ok (VBool (v1 < v2))
   | Lte, Ok (VNum v1), Ok (VNum v2) -> Ok (VBool (v1 <= v2))
   | Gt, Ok (VNum v1), Ok (VNum v2) -> Ok (VBool (v1 > v2))
@@ -66,6 +65,6 @@ and eval_bop op e1 e2 =
   | _ -> Error (InvalidArgs op)
 
 let interp (input : string) : (value, error) result =
-  match parse input with  
-  | Some prog -> eval prog  
+  match parse input with
+  | Some prog -> eval prog
   | None -> Error ParseFail
