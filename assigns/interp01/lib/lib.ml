@@ -1,5 +1,7 @@
 open Utils
-open My_parser
+
+let parse = My_parser.parse
+
 
 let value_to_expr = function
   | VNum n -> Num n
