@@ -50,25 +50,33 @@ let rec eval (e : expr) : (value, error) result =
   | Bop (op, e1, e2) -> eval_bop op e1 e2
 
 and eval_bop op e1 e2 =
-  match eval e1, eval e2 with
-  | Error err, _ -> Error err  
-  | _, Error err -> Error err
-  | Ok (VNum v1), Ok (VNum v2) -> (match op with
-    | Add -> Ok (VNum (v1 + v2))
-    | Sub -> Ok (VNum (v1 - v2))
-    | Mul -> Ok (VNum (v1 * v2))
-    | Div -> if v2 = 0 then Error DivByZero else Ok (VNum (v1 / v2))
-    | Mod -> if v2 = 0 then Error DivByZero else Ok (VNum (v1 mod v2))
-    | Lt -> Ok (VBool (v1 < v2))
-    | Lte -> Ok (VBool (v1 <= v2))
-    | Gt -> Ok (VBool (v1 > v2))
-    | Gte -> Ok (VBool (v1 >= v2))
-    | _ -> Error (InvalidArgs op))
-  | Ok (VBool b1), Ok (VBool b2) -> (match op with
-    | And -> Ok (VBool (b1 && b2))
-    | Or -> Ok (VBool (b1 || b2))
-    | _ -> Error (InvalidArgs op))
-  | _ -> Error (InvalidArgs op)
+  match op with
+  | And -> (
+      match eval e1 with
+      | Ok (VBool false) -> Ok (VBool false)
+      | Ok (VBool true) -> eval e2
+      | _ -> Error (InvalidArgs And))
+  | Or -> (
+      match eval e1 with
+      | Ok (VBool true) -> Ok (VBool true)
+      | Ok (VBool false) -> eval e2
+      | _ -> Error (InvalidArgs Or))
+  | _ -> 
+      match eval e1, eval e2 with
+      | Error err, _ -> Error err
+      | _, Error err -> Error err
+      | Ok (VNum v1), Ok (VNum v2) -> (match op with
+          | Add -> Ok (VNum (v1 + v2))
+          | Sub -> Ok (VNum (v1 - v2))
+          | Mul -> Ok (VNum (v1 * v2))
+          | Div -> if v2 = 0 then Error DivByZero else Ok (VNum (v1 / v2))
+          | Mod -> if v2 = 0 then Error DivByZero else Ok (VNum (v1 mod v2))
+          | Lt -> Ok (VBool (v1 < v2))
+          | Lte -> Ok (VBool (v1 <= v2))
+          | Gt -> Ok (VBool (v1 > v2))
+          | Gte -> Ok (VBool (v1 >= v2))
+          | _ -> Error (InvalidArgs op))
+      | _ -> Error (InvalidArgs op)
 
 let interp (input : string) : (value, error) result =
   match parse input with
