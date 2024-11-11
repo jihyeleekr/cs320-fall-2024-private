@@ -1,3 +1,4 @@
+
 open Utils
 
 let parse = My_parser.parse
@@ -8,17 +9,38 @@ let value_to_expr = function
   | VUnit -> Unit
   | VFun (arg, body) -> Fun (arg, body)
 
+let replace_var x y =
+let rec go = function
+    | Var z -> if z = y then Var x else Var z
+    | App (e1, e2) -> App (go e1, go e2)
+    | Fun (z, e) ->
+        if z = y then Fun (z, e)  
+        else Fun (z, go e)
+    | Let (z, e1, e2) ->
+        if z = y then Let (z, go e1, e2)  
+        else Let (z, go e1, go e2)
+    | If (cond, e1, e2) -> If (go cond, go e1, go e2)
+    | Bop (op, e1, e2) -> Bop (op, go e1, go e2)
+    | Num n -> Num n
+    | True -> True
+    | False -> False
+    | Unit -> Unit
+in go
   let rec subst (v : value) (x : string) (e : expr) : expr =
     match e with
     | Num _ | True | False | Unit -> e
     | Var y -> if y = x then value_to_expr v else e
     | If (cond, e1, e2) -> If (subst v x cond, subst v x e1, subst v x e2)
     | Let (y, e1, e2) ->
-        if y = x then Let (y, subst v x e1, e2)  
-        else Let (y, subst v x e1, subst v x e2)
+        if y = x then Let (y, subst v x e1, e2)
+        else
+          let z = gensym () in
+          Let (z, subst v x e1, subst v x (replace_var z y e2))
     | Fun (y, body) ->
-        if y = x then e  
-        else Fun (y, subst v x body)  
+    if y = x then e
+    else
+        let z = gensym () in
+        Fun (z, subst v x (replace_var z y body))
     | App (e1, e2) -> App (subst v x e1, subst v x e2)
     | Bop (op, e1, e2) -> Bop (op, subst v x e1, subst v x e2)
 
