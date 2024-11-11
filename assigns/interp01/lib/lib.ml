@@ -8,19 +8,19 @@ let value_to_expr = function
   | VUnit -> Unit
   | VFun (arg, body) -> Fun (arg, body)
 
-let rec subst (v : value) (x : string) (e : expr) : expr =
-  match e with
-  | Num _ | True | False | Unit -> e
-  | Var y -> if y = x then value_to_expr v else e
-  | If (cond, e1, e2) -> If (subst v x cond, subst v x e1, subst v x e2)
-  | Let (y, e1, e2) ->
-      if y = x then Let (y, subst v x e1, e2) 
-      else Let (y, subst v x e1, subst v x e2)
-  | Fun (y, body) ->
-      if y = x then e 
-      else Fun (y, subst v x body)
-  | App (e1, e2) -> App (subst v x e1, subst v x e2)
-  | Bop (op, e1, e2) -> Bop (op, subst v x e1, subst v x e2)
+  let rec subst (v : value) (x : string) (e : expr) : expr =
+    match e with
+    | Num _ | True | False | Unit -> e
+    | Var y -> if y = x then value_to_expr v else e
+    | If (cond, e1, e2) -> If (subst v x cond, subst v x e1, subst v x e2)
+    | Let (y, e1, e2) ->
+        if y = x then Let (y, subst v x e1, e2)  
+        else Let (y, subst v x e1, subst v x e2)
+    | Fun (y, body) ->
+        if y = x then e  
+        else Fun (y, subst v x body)  
+    | App (e1, e2) -> App (subst v x e1, subst v x e2)
+    | Bop (op, e1, e2) -> Bop (op, subst v x e1, subst v x e2)
 
 let eval_bop op v1 v2 =
   match op, v1, v2 with
