@@ -36,4 +36,5 @@ rule read =
   | num           { NUM (int_of_string (Lexing.lexeme lexbuf)) }
   | var           { VAR (Lexing.lexeme lexbuf) }
   | whitespace    { read lexbuf }  
-  | eof           { EOF }    
+  | eof           { EOF }
+
