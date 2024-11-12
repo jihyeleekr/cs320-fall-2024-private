@@ -8,6 +8,9 @@ let num = '-'? ['0'-'9']+
 
 rule read =
   parse
+  | "int" { INT }
+  | "bool" { BOOL }
+  | ":" { COLON }
   | "fun" { FUN }
   | "let" { LET }
   | "rec" { REC }
