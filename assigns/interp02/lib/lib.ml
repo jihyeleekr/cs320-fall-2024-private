@@ -60,7 +60,6 @@ let desugar (prog : prog) : expr =
   in
   desugar_toplets prog
 
-
 (* Type checking *)
 let type_of (expr : expr) : (ty, error) result =
   let rec typecheck env expr =
