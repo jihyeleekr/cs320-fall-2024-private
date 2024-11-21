@@ -10,37 +10,48 @@ exception AssertFail
 (* Desugaring: Convert prog to expr *)
 let desugar (prog : prog) : expr =
   let rec desugar_toplets = function
-    | [] -> Unit
-    | { is_rec; name; args; ty; value } :: rest ->
-        let func =
-          List.fold_right
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
-            args
+    | [] -> Unit 
+    | [{ is_rec; name; args; ty; value }] -> 
+        let func = 
+          List.fold_right 
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
+            args 
+            (desugar_expr value)
+        in
+        Let { is_rec; name; ty; value = func; body = Unit }
+    | { is_rec; name; args; ty; value } :: rest -> 
+        let func = 
+          List.fold_right 
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
+            args 
             (desugar_expr value)
         in
         Let { is_rec; name; ty; value = func; body = desugar_toplets rest }
-  and desugar_expr = function
+    and desugar_expr = function
     | SLet { is_rec; name; args; ty; value; body } ->
-        let func =
-          List.fold_right
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
-            args
+        let func = 
+          List.fold_right 
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
+            args 
             (desugar_expr value)
         in
         Let { is_rec; name; ty; value = func; body = desugar_expr body }
     | SIf (cond, then_, else_) ->
         If (desugar_expr cond, desugar_expr then_, desugar_expr else_)
     | SFun { arg; args; body } ->
-        let curried_body =
-          List.fold_right
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
-            args
+        let curried_body = 
+          List.fold_right 
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
+            args 
             (desugar_expr body)
         in
         Fun (fst arg, snd arg, curried_body)
-    | SApp (e1, e2) -> App (desugar_expr e1, desugar_expr e2)
-    | SBop (op, e1, e2) -> Bop (op, desugar_expr e1, desugar_expr e2)
-    | SAssert e -> Assert (desugar_expr e)
+    | SApp (e1, e2) ->
+        App (desugar_expr e1, desugar_expr e2)
+    | SBop (op, e1, e2) ->
+        Bop (op, desugar_expr e1, desugar_expr e2)
+    | SAssert e ->
+        Assert (desugar_expr e)
     | SUnit -> Unit
     | STrue -> True
     | SFalse -> False
@@ -48,6 +59,7 @@ let desugar (prog : prog) : expr =
     | SVar x -> Var x
   in
   desugar_toplets prog
+
 
 (* Type checking *)
 let type_of (expr : expr) : (ty, error) result =
