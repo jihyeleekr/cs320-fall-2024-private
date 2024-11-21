@@ -47,11 +47,7 @@ open Utils
 %%
 
 prog:
-  | toplist = toplist EOF { List.rev toplist }
-
-toplist:
-  | toplist = toplist toplet = toplet { toplet :: toplist }
-  | toplet = toplet { [toplet] }
+  | toplist = toplet *  EOF { toplist }
 
 toplet:
   | "let" x = VAR args_opt = args_opt ":" ty = ty "=" e = expr
