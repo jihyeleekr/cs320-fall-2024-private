@@ -11,41 +11,41 @@ exception AssertFail
 let desugar (prog : prog) : expr =
   let rec desugar_toplets = function
     | [] -> Unit 
-    | [{ is_rec; name; args; ty; value }] -> 
-        let func = 
-          List.fold_right 
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
-            args 
+    | [{ is_rec; name; args; ty; value }] ->
+        let desugared_value = 
+          List.fold_right
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
+            args
             (desugar_expr value)
         in
-        Let { is_rec; name; ty; value = func; body = Unit }
-    | { is_rec; name; args; ty; value } :: rest -> 
-        let func = 
-          List.fold_right 
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
-            args 
+        Let { is_rec; name; ty; value = desugared_value; body = Unit }
+    | { is_rec; name; args; ty; value } :: rest ->
+        let desugared_value =
+          List.fold_right
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
+            args
             (desugar_expr value)
         in
-        Let { is_rec; name; ty; value = func; body = desugar_toplets rest }
-    and desugar_expr = function
+        Let { is_rec; name; ty; value = desugared_value; body = desugar_toplets rest }
+  and desugar_expr = function
     | SLet { is_rec; name; args; ty; value; body } ->
-        let func = 
-          List.fold_right 
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
-            args 
+        let desugared_value =
+          List.fold_right
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
+            args
             (desugar_expr value)
         in
-        Let { is_rec; name; ty; value = func; body = desugar_expr body }
-    | SIf (cond, then_, else_) ->
-        If (desugar_expr cond, desugar_expr then_, desugar_expr else_)
+        Let { is_rec; name; ty; value = desugared_value; body = desugar_expr body }
     | SFun { arg; args; body } ->
-        let curried_body = 
-          List.fold_right 
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc)) 
-            args 
+        let curried_body =
+          List.fold_right
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
+            args
             (desugar_expr body)
         in
         Fun (fst arg, snd arg, curried_body)
+    | SIf (cond, then_, else_) ->
+        If (desugar_expr cond, desugar_expr then_, desugar_expr else_)
     | SApp (e1, e2) ->
         App (desugar_expr e1, desugar_expr e2)
     | SBop (op, e1, e2) ->
