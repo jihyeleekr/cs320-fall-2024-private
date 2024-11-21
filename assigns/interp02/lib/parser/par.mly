@@ -55,8 +55,8 @@ prog:
 toplet:
   | "let" x = VAR args = arg* ":" ty = ty "=" e = expr
     { { is_rec = false; name = x; args = args; ty; value = e } }
-  | "let" "rec" x = VAR args = arg* ":" ty = ty "=" e = expr
-    { { is_rec = true; name = x; args = args; ty; value = e } }
+  | "let" "rec" x = VAR arg = arg args = arg* ":" ty = ty "=" e = expr
+    { { is_rec = true; name = x; arg = arg ;args = args; ty; value = e } }
 
 arg:
   | "(" x = VAR ":" ty = ty ")" { (x, ty) }
@@ -74,9 +74,9 @@ expr:
   | "let" "rec" x = VAR args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
     { SLet { is_rec = true; name = x; args = args; ty; value = e1; body = e2 } }
   | "if" e1 = expr "then" e2 = expr "else" e3 = expr
-      { SIf(e1, e2, e3) }
+    { SIf(e1, e2, e3) }
   | "fun" arg=arg ; args=arg* "->" e = expr
-      { SFun { arg = arg; args = args; body = e } }
+    { SFun { arg = arg; args = args; body = e } }
   | e = expr2 { e }
 
 expr2:
@@ -86,7 +86,6 @@ expr2:
       { SAssert e }
   | e = expr3 es = expr3*
       { List.fold_left (fun e1 e2 -> SApp (e1, e2)) e es }
-
 
 expr3:
   | UNIT { SUnit }
