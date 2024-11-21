@@ -69,10 +69,10 @@ ty:
   | t1 = ty "->" t2 = ty { FunTy(t1, t2) }
 
 expr:
-  |  "let" x = VAR args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
-      { SLet { is_rec = false; name = x; args = args; ty; value = e1; body = e2 } }
+  | "let" x = VAR args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
+    { SLet { is_rec = false; name = x; args = args; ty; value = e1; body = e2 } }
   | "let" "rec" x = VAR args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
-      { SLet { is_rec = true; name = x; args = args; ty; value = e1; body = e2 } }
+    { SLet { is_rec = true; name = x; args = args; ty; value = e1; body = e2 } }
   | "if" e1 = expr "then" e2 = expr "else" e3 = expr
       { SIf(e1, e2, e3) }
   | "fun" arg=arg ; args=arg* "->" e = expr
@@ -80,9 +80,13 @@ expr:
   | e = expr2 { e }
 
 expr2:
-  | e1 = expr2 bop = bop e2 = expr2 { SBop(bop, e1, e2) }
-  | "assert" e = expr3 { SAssert e }
-  | e = expr3 { e }
+  | e1 = expr2 bop = bop e2 = expr2
+      { SBop(bop, e1, e2) }
+  | "assert" e = expr3
+      { SAssert e }
+  | e = expr3 es = expr3*
+      { List.fold_left (fun e1 e2 -> SApp (e1, e2)) e es }
+
 
 expr3:
   | UNIT { SUnit }
