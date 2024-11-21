@@ -9,7 +9,7 @@ open Utils
 %token RPAREN ")"
 %token LET "let"
 %token REC "rec"
-%token EQUALS "="
+%token EQ "="
 %token DIV "/"
 %token MOD "mod"
 %token LT "<"
@@ -38,7 +38,7 @@ open Utils
 %token BOOL "bool"
 
 %right ARROW
-%left EQUALS
+%left EQ
 %left PLUS MINUS
 %left TIMES
 
@@ -47,7 +47,7 @@ open Utils
 %%
 
 prog:
-  | toplist = toplet *  EOF { toplist }
+  | toplist = toplet * EOF { toplist }
 
 toplet:
   | "let" x = VAR args_opt = args_opt ":" ty = ty "=" e = expr
@@ -56,7 +56,8 @@ toplet:
     { { is_rec = true; name = x; args = args_opt; ty; value = e } }
 
 args_opt:
-  | args = args { args }
+  args = args { args }
+| { [] } 
 
 args:
   | arg = arg args = args { arg :: args }
@@ -69,8 +70,8 @@ ty:
   | "int" { IntTy }
   | "bool" { BoolTy }
   | "unit" { UnitTy }
+  | "(" t = ty ")" { t }
   | t1 = ty "->" t2 = ty { FunTy(t1, t2) }
-  | "(" ty = ty ")" { ty }
 
 expr:
   | "let" x = VAR args_opt = args_opt ":" ty = ty "=" e1 = expr "in" e2 = expr

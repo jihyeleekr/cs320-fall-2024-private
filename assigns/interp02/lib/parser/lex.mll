@@ -30,7 +30,7 @@ rule read = parse
 | "<=" { LTE }
 | '>' { GT }
 | ">=" { GTE }
-| '=' { EQUALS }
+| '=' { EQ }
 | "<>" { NEQ }
 | "&&" { AND }
 | "||" { OR }
