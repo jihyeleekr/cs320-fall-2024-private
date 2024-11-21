@@ -30,17 +30,20 @@ open Utils
 %token MINUS "-"
 %token TRUE "true"
 %token FALSE "false"
-%token UNIT "unit"
 %token ASSERT "assert"
 
+%token INTTY "int"
+%token BOOLTY "bool"
 %token COLON ":"
-%token INT "int"
-%token BOOL "bool"
+
+%token UNIT "()"
+%token UNITTY "unit"
 
 %right ARROW
-%left EQ
+%right OR AND
+%left LT LTE GT GTE EQ
 %left PLUS MINUS
-%left TIMES
+%left TIMES DIV MOD
 
 %start <Utils.prog> prog
 
@@ -50,18 +53,10 @@ prog:
   | toplist = toplet * EOF { toplist }
 
 toplet:
-  | "let" x = VAR args_opt = args_opt ":" ty = ty "=" e = expr
-    { { is_rec = false; name = x; args = args_opt; ty; value = e } }
-  | "let" "rec" x = VAR args_opt = args_opt ":" ty = ty "=" e = expr
-    { { is_rec = true; name = x; args = args_opt; ty; value = e } }
-
-args_opt:
-  args = args { args }
-| { [] } 
-
-args:
-  | arg = arg args = args { arg :: args }
-  | arg = arg { [arg] }
+  | "let" x = VAR arg = arg ":" ty = ty "=" e = expr
+    { { is_rec = false; name = x; arg = [arg]; ty; value = e } }
+  | "let" "rec" x = VAR arg = arg ":" ty = ty "=" e = expr
+    { { is_rec = true; name = x; arg = [arg]; ty; value = e } }
 
 arg:
   | "(" x = VAR ":" ty = ty ")" { (x, ty) }
@@ -74,14 +69,15 @@ ty:
   | t1 = ty "->" t2 = ty { FunTy(t1, t2) }
 
 expr:
-  | "let" x = VAR args_opt = args_opt ":" ty = ty "=" e1 = expr "in" e2 = expr
-    { SLet { is_rec = false; name = x; args = args_opt; ty; value = e1; body = e2 } }
-  | "let" "rec" x = VAR args_opt = args_opt ":" ty = ty "=" e1 = expr "in" e2 = expr
-    { SLet { is_rec = true; name = x; args = args_opt; ty; value = e1; body = e2 } }
-  | "if" e1 = expr "then" e2 = expr "else" e3 = expr { SIf(e1, e2, e3) }
-  | "fun" arg = arg args = args "->" e = expr { SFun { arg; args; body = e } }
+  |  "let" x = VAR arg = arg ":" ty = ty "=" e1 = expr "in" e2 = expr
+      { SLet { is_rec = false; name = x; arg = arg; ty; value = e1; body = e2 } }
+  | "let" "rec" x = VAR arg = arg ":" ty = ty "=" e1 = expr "in" e2 = expr
+      { SLet { is_rec = true; name = x; arg = arg; ty; value = e1; body = e2 } }
+  | "if" e1 = expr "then" e2 = expr "else" e3 = expr
+      { SIf(e1, e2, e3) }
+  | "fun" arg = arg arg = arg "->" e = expr
+      { SFun { arg; arg; body = e } }
   | e = expr2 { e }
-  
 
 expr2:
   | e1 = expr2 bop = bop e2 = expr2 { SBop(bop, e1, e2) }

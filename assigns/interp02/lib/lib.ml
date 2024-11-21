@@ -167,12 +167,12 @@ let eval (expr : expr) : value =
   in
   eval_expr Env.empty expr
 
-(* Interpreter function *)
-let interp (input : string) : (value, error) result =
+  let interp (input : string) : (value, error) result =
     match parse input with
-    | None -> Error ParseErr
-    | Some prog ->
+    | Some prog -> (
         let expr = desugar prog in
         match type_of expr with
         | Ok _ -> Ok (eval expr)
         | Error e -> Error e
+    )
+    | None -> Error ParseErr
