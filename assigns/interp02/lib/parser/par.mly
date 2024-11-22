@@ -56,7 +56,7 @@ toplet:
   | "let" x = VAR args = arg* ":" ty = ty "=" e = expr
     { { is_rec = false; name = x; args = args; ty; value = e } }
   | "let" "rec" x = VAR arg = arg ; args = arg* ":" ty = ty "=" e = expr
-    { { is_rec = true; name = x ; args = arg :: args; ty; value = e } }
+    { { is_rec = true; name = x; args = arg :: args; ty; value = e } }
 
 arg:
   | "(" x = VAR ":" ty = ty ")" { (x, ty) }
@@ -77,10 +77,11 @@ expr:
     { SIf(e1, e2, e3) }
   | "fun" arg = arg ; args = arg* "->" e = expr
     { SFun { arg = arg; args = args; body = e } }
+  | "(" e = expr ")" { e }
   | e = expr2 { e }
 
 expr2:
-  | e1 = expr2 bop = bop e2 = expr3
+  | e1 = expr2 bop = bop e2 = expr2
     { SBop(bop, e1, e2) }
   | "assert" e = expr3
     { SAssert e }
