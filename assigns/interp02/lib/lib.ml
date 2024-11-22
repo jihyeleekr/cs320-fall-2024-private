@@ -111,8 +111,9 @@ let type_of (expr : expr) : (ty, error) result =
                 let ty_else = typecheck env else_ in
                 match ty_then, ty_else with
                 | Ok ty_then, Ok ty_else when ty_then = ty_else -> Ok ty_then
-                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))
-                | Error e, _ | _, Error e -> Error e
+                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))  (* Correct order *)
+                | Error e, _ -> Error e
+                | _, Error e -> Error e
             )
             | Ok ty -> Error (IfCondTyErr ty)
             | Error e -> Error e
