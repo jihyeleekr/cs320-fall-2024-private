@@ -49,8 +49,6 @@ open Utils
 
 %%
 
-(* Grammar starts here *)
-
 prog:
   | ls = toplet * EOF { ls }
 
@@ -82,7 +80,7 @@ expr:
   | e = expr2 { e }
 
 expr2:
-  | e1 = expr2 bop = bop e2 = expr2
+  | e1 = expr2 bop = bop e2 = expr3
     { SBop(bop, e1, e2) }
   | "assert" e = expr3
     { SAssert e }
@@ -111,4 +109,3 @@ bop:
   | "<>" { Neq }
   | "&&" { And }
   | "||" { Or }
-
