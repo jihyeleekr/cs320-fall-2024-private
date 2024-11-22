@@ -11,14 +11,6 @@ exception AssertFail
 let desugar (prog : prog) : expr =
     let rec desugar_toplets = function
       | [] -> Unit  
-      | [{ is_rec; name; args; ty; value }] ->
-          let desugared_value =
-            List.fold_right
-              (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
-              args
-              (desugar_expr value)
-          in
-          Let { is_rec; name; ty; value = desugared_value; body = Unit }
       | { is_rec; name; args; ty; value } :: rest ->
           let desugared_value =
             List.fold_right
@@ -40,13 +32,13 @@ let desugar (prog : prog) : expr =
             name;
             ty;
             value = desugared_value;
-            body = desugar_expr body;  
+            body = desugar_expr body;
           }
       | SFun { arg; args; body } ->
           List.fold_right
             (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
             (arg :: args)
-            (desugar_expr body)  
+            (desugar_expr body)
       | SIf (cond, then_, else_) ->
           If (desugar_expr cond, desugar_expr then_, desugar_expr else_)
       | SApp (e1, e2) ->
@@ -62,6 +54,7 @@ let desugar (prog : prog) : expr =
       | SVar x -> Var x
     in
     desugar_toplets prog
+
 (* Type checking *)
 let type_of (expr : expr) : (ty, error) result =
     let rec typecheck env expr =
@@ -118,18 +111,16 @@ let type_of (expr : expr) : (ty, error) result =
                 | Error e -> Error e
                 | Ok ty2 -> (
                     match op with
-                    | Add | Sub | Mul | Div | Mod ->
-                        if ty1 = IntTy && ty2 = IntTy then Ok IntTy
-                        else if ty1 <> IntTy then Error (OpTyErrL (op, IntTy, ty1))
-                        else Error (OpTyErrR (op, IntTy, ty2))
-                    | Lt | Lte | Gt | Gte | Eq | Neq ->
-                        if ty1 = IntTy && ty2 = IntTy then Ok BoolTy
-                        else if ty1 <> IntTy then Error (OpTyErrL (op, IntTy, ty1))
-                        else Error (OpTyErrR (op, IntTy, ty2))
-                    | And | Or ->
-                        if ty1 = BoolTy && ty2 = BoolTy then Ok BoolTy
-                        else if ty1 <> BoolTy then Error (OpTyErrL (op, BoolTy, ty1))
-                        else Error (OpTyErrR (op, BoolTy, ty2))
+                    | Add | Sub | Mul | Div | Mod when ty1 = IntTy && ty2 = IntTy -> Ok IntTy
+                    | Lt | Lte | Gt | Gte | Eq | Neq when ty1 = IntTy && ty2 = IntTy -> Ok BoolTy
+                    | And | Or when ty1 = BoolTy && ty2 = BoolTy -> Ok BoolTy
+                    | Add | Sub | Mul | Div | Mod when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
+                    | Add | Sub | Mul | Div | Mod when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
+                    | Lt | Lte | Gt | Gte | Eq | Neq when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
+                    | Lt | Lte | Gt | Gte | Eq | Neq when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
+                    | And | Or when ty1 <> BoolTy -> Error (OpTyErrL (op, BoolTy, ty1))
+                    | And | Or when ty2 <> BoolTy -> Error (OpTyErrR (op, BoolTy, ty2))
+                    | _ -> Error (OpTyErrL (op, ty1, ty2))
                 )
             )
         )
@@ -143,8 +134,6 @@ let type_of (expr : expr) : (ty, error) result =
     typecheck Env.empty expr
 
 
-
-  
 (* Evaluation *)
 let eval (expr : expr) : value =
     let rec eval_expr env expr =
