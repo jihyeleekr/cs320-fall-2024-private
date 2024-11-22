@@ -56,7 +56,7 @@ toplet:
   | "let" x = VAR args = arg* ":" ty = ty "=" e = expr
     { { is_rec = false; name = x; args = args; ty; value = e } }
   | "let" "rec" x = VAR arg = arg ; args = arg* ":" ty = ty "=" e = expr
-    { { is_rec = true; name = x ; args = arg :: args; ty; value = e } }
+    { { is_rec = true; name = x; args = arg :: args; ty; value = e } }
 
 arg:
   | "(" x = VAR ":" ty = ty ")" { (x, ty) }
