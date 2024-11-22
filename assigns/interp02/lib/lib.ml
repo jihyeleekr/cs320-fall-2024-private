@@ -18,7 +18,10 @@ let desugar (prog : prog) : expr =
               args
               (desugar_expr value)
           in
-          Let { is_rec; name; ty; value = desugared_value; body = desugar_toplets rest }
+          if is_rec then
+            Let { is_rec = true; name; ty; value = desugared_value; body = desugar_toplets rest }
+          else
+            Let { is_rec = false; name; ty; value = desugared_value; body = desugar_toplets rest }
     and desugar_expr = function
       | SLet { is_rec; name; args; ty; value; body } ->
           let desugared_value =
@@ -27,13 +30,22 @@ let desugar (prog : prog) : expr =
               args
               (desugar_expr value)
           in
-          Let {
-            is_rec;
-            name;
-            ty;
-            value = desugared_value;
-            body = desugar_expr body;
-          }
+          if is_rec then
+            Let {
+              is_rec = true;
+              name;
+              ty;
+              value = desugared_value;
+              body = desugar_expr body;
+            }
+          else
+            Let {
+              is_rec = false;
+              name;
+              ty;
+              value = desugared_value;
+              body = desugar_expr body;
+            }
       | SFun { arg; args; body } ->
           List.fold_right
             (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
@@ -54,6 +66,8 @@ let desugar (prog : prog) : expr =
       | SVar x -> Var x
     in
     desugar_toplets prog
+
+
 
 (* Type checking *)
 let type_of (expr : expr) : (ty, error) result =
