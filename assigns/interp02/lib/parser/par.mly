@@ -56,7 +56,7 @@ toplet:
   | "let" x = VAR args = arg* ":" ty = ty "=" e = expr
     { { is_rec = false; name = x; args = args; ty; value = e } }
   | "let" "rec" x = VAR arg = arg ; args = arg* ":" ty = ty "=" e = expr
-    { { is_rec = true; name = x; args = arg :: args; ty; value = e } }
+    { { is_rec = true; name = x ; args = arg :: args; ty; value = e } }
 
 arg:
   | "(" x = VAR ":" ty = ty ")" { (x, ty) }
@@ -65,9 +65,8 @@ ty:
   | "int" { IntTy }
   | "bool" { BoolTy }
   | "unit" { UnitTy }
-  | t1 = ty "->" t2 = ty { FunTy(t1, t2) }
   | "(" t = ty ")" { t }
-
+  | t1 = ty "->" t2 = ty { FunTy(t1, t2) }
 
 expr:
   | "let" x = VAR args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
@@ -81,7 +80,7 @@ expr:
   | e = expr2 { e }
 
 expr2:
-  | e1 = expr2 bop = bop e2 = expr2
+  | e1 = expr2 bop = bop e2 = expr3
     { SBop(bop, e1, e2) }
   | "assert" e = expr3
     { SAssert e }
