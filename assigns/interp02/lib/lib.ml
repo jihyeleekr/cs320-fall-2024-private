@@ -18,10 +18,7 @@ let desugar (prog : prog) : expr =
               args
               (desugar_expr value)
           in
-          if is_rec then
-            Let { is_rec = true; name; ty; value = desugared_value; body = desugar_toplets rest }
-          else
-            Let { is_rec = false; name; ty; value = desugared_value; body = desugar_toplets rest }
+          Let { is_rec; name; ty; value = desugared_value; body = desugar_toplets rest }
     and desugar_expr = function
       | SLet { is_rec; name; args; ty; value; body } ->
           let desugared_value =
@@ -30,22 +27,13 @@ let desugar (prog : prog) : expr =
               args
               (desugar_expr value)
           in
-          if is_rec then
-            Let {
-              is_rec = true;
-              name;
-              ty;
-              value = desugared_value;
-              body = desugar_expr body;
-            }
-          else
-            Let {
-              is_rec = false;
-              name;
-              ty;
-              value = desugared_value;
-              body = desugar_expr body;
-            }
+          Let {
+            is_rec;
+            name;
+            ty;
+            value = desugared_value;
+            body = desugar_expr body;
+          }
       | SFun { arg; args; body } ->
           List.fold_right
             (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
@@ -54,7 +42,12 @@ let desugar (prog : prog) : expr =
       | SIf (cond, then_, else_) ->
           If (desugar_expr cond, desugar_expr then_, desugar_expr else_)
       | SApp (e1, e2) ->
-          App (desugar_expr e1, desugar_expr e2)
+    let rec desugar_app acc = function
+      | SApp (inner_e1, inner_e2) -> desugar_app (App (acc, desugar_expr inner_e2)) inner_e1
+      | other -> App (desugar_expr other, acc)
+    in
+    desugar_app (desugar_expr e2) e1
+
       | SBop (op, e1, e2) ->
           Bop (op, desugar_expr e1, desugar_expr e2)
       | SAssert e ->
@@ -66,8 +59,6 @@ let desugar (prog : prog) : expr =
       | SVar x -> Var x
     in
     desugar_toplets prog
-
-
 
 (* Type checking *)
 let type_of (expr : expr) : (ty, error) result =
