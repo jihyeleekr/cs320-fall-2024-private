@@ -40,8 +40,9 @@ open Utils
 %token UNITTY "unit"
 
 %right ARROW
-%right OR AND
-%left LT LTE GT GTE EQ
+%right OR
+%right AND
+%left LT LTE GT GTE EQ NEQ
 %left PLUS MINUS
 %left TIMES DIV MOD
 
@@ -80,7 +81,7 @@ expr:
   | e = expr2 { e }
 
 expr2:
-  | e1 = expr2 bop = bop e2 = expr3
+  | e1 = expr2 bop = bop e2 = expr2
     { SBop(bop, e1, e2) }
   | "assert" e = expr3
     { SAssert e }
