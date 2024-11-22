@@ -10,17 +10,29 @@ exception AssertFail
 (* Desugaring: Convert prog to expr *)
 let desugar (prog : prog) : expr =
     let rec desugar_toplets = function
-      | [] -> Unit  
+      | [] -> Unit
       | { is_rec; name; args; ty; value } :: rest ->
+          let function_type =
+            List.fold_right
+              (fun (_, arg_ty) acc -> FunTy(arg_ty, acc))
+              (args)
+              ty
+          in
           let desugared_value =
             List.fold_right
               (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
               args
               (desugar_expr value)
           in
-          Let { is_rec; name; ty; value = desugared_value; body = desugar_toplets rest }
+          Let { is_rec; name; ty = function_type; value = desugared_value; body = desugar_toplets rest }
     and desugar_expr = function
       | SLet { is_rec; name; args; ty; value; body } ->
+          let function_type =
+            List.fold_right
+              (fun (_, arg_ty) acc -> FunTy(arg_ty, acc))
+              (args)
+              ty
+          in
           let desugared_value =
             List.fold_right
               (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
@@ -30,7 +42,7 @@ let desugar (prog : prog) : expr =
           Let {
             is_rec;
             name;
-            ty;
+            ty = function_type;
             value = desugared_value;
             body = desugar_expr body;
           }
@@ -54,7 +66,7 @@ let desugar (prog : prog) : expr =
       | SVar x -> Var x
     in
     desugar_toplets prog
-
+  
 (* Type checking *)
 let type_of (expr : expr) : (ty, error) result =
     let rec typecheck env expr =
@@ -122,6 +134,7 @@ let type_of (expr : expr) : (ty, error) result =
                     | And | Or when ty2 <> BoolTy -> Error (OpTyErrR (op, BoolTy, ty2))
                     | _ -> Error (OpTyErrL (op, ty1, ty2))
                 )
+
             )
         )
         | Assert e -> (
