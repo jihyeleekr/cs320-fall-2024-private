@@ -42,12 +42,7 @@ let desugar (prog : prog) : expr =
       | SIf (cond, then_, else_) ->
           If (desugar_expr cond, desugar_expr then_, desugar_expr else_)
       | SApp (e1, e2) ->
-    let rec desugar_app acc = function
-      | SApp (inner_e1, inner_e2) -> desugar_app (App (acc, desugar_expr inner_e2)) inner_e1
-      | other -> App (desugar_expr other, acc)
-    in
-    desugar_app (desugar_expr e2) e1
-
+          App (desugar_expr e1, desugar_expr e2)
       | SBop (op, e1, e2) ->
           Bop (op, desugar_expr e1, desugar_expr e2)
       | SAssert e ->
@@ -179,7 +174,7 @@ let eval (expr : expr) : value =
           | VNum n1, VNum n2, Add -> VNum (n1 + n2)
           | VNum n1, VNum n2, Sub -> VNum (n1 - n2)
           | VNum n1, VNum n2, Mul -> VNum (n1 * n2)
-          | VNum n1, VNum n2, Div -> VNum (n1 / n2)
+          | VNum n1, VNum n2, Div -> if n2 = 0 then raise DivByZero else VNum (n1 / n2)
           | VNum n1, VNum n2, Mod -> VNum (n1 mod n2)
           | VNum n1, VNum n2, Lt -> VBool (n1 < n2)
           | VNum n1, VNum n2, Lte -> VBool (n1 <= n2)
