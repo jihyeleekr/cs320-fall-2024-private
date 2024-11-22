@@ -10,6 +10,7 @@ rule read = parse
 | ":" { COLON }
 | "int" { INTTY }
 | "bool" { BOOLTY }
+| "unit" {UNITTY}
 | '(' { LPAREN }
 | ')' { RPAREN }
 | "->" { ARROW }
@@ -23,7 +24,6 @@ rule read = parse
 | "true" { TRUE }
 | "false" { FALSE }
 | "assert" { ASSERT }
-| "unit" {UNITTY}
 | "()" {UNIT}
 | '+' { PLUS }
 | '-' { MINUS }

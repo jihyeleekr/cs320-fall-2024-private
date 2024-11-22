@@ -1,6 +1,6 @@
 
-let sum_of_squares = fun x -> fun y ->
-  let x_squared = x * x in
-  let y_squared = y * y in
+let sum_of_squares (x : int) (y : int) : int =
+  let x_squared : int = x * x in
+  let y_squared : int = y * y in
   x_squared + y_squared
-in sum_of_squares 3 (-5)
+let _ : unit = assert (sum_of_squares 3 (-5) = 34)

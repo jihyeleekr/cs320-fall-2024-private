@@ -81,11 +81,11 @@ expr:
 
 expr2:
   | e1 = expr2 bop = bop e2 = expr2
-      { SBop(bop, e1, e2) }
+    { SBop(bop, e1, e2) }
   | "assert" e = expr3
-      { SAssert e }
+    { SAssert e }
   | e = expr3 es = expr3*
-      { List.fold_left (fun e1 e2 -> SApp (e1, e2)) e es }
+    { List.fold_left (fun e1 e2 -> SApp (e1, e2)) e es }
 
 expr3:
   | UNIT { SUnit }
