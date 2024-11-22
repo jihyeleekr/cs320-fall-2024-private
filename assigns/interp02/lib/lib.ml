@@ -80,13 +80,13 @@ let type_of (expr : expr) : (ty, error) result =
             | None -> Error (UnknownVar x)
         )
         | Let { is_rec; name; ty = expected_ty; value; body } -> (
-            match typecheck env value with
+            let extended_env = 
+                if is_rec then Env.add name expected_ty env else env
+            in
+            match typecheck extended_env value with
             | Ok actual_ty ->
                 if actual_ty = expected_ty then
-                    let extended_env =
-                        if is_rec then Env.add name expected_ty env else env
-                    in
-                    typecheck (Env.add name expected_ty extended_env) body
+                    typecheck (Env.add name expected_ty env) body
                 else Error (LetTyErr (expected_ty, actual_ty))
             | Error e -> Error e
         )
@@ -95,19 +95,20 @@ let type_of (expr : expr) : (ty, error) result =
             (match typecheck extended_env body with
             | Ok body_ty -> Ok (FunTy (arg_ty, body_ty))
             | Error e -> Error e)
-        | App (e1, e2) -> (
-            match typecheck env e1, typecheck env e2 with
-            | Error e, _ -> Error e
-            | _, Error e -> Error e
-            | Ok (FunTy (arg_ty, ret_ty)), Ok actual_ty ->
-                if arg_ty = actual_ty then Ok ret_ty
-                else Error (FunArgTyErr (arg_ty, actual_ty))
-            | Ok ty, _ -> Error (FunAppTyErr ty)
-        )
+            | App (e1, e2) -> (
+                match typecheck env e1, typecheck env e2 with
+                | Ok (FunTy (arg_ty, ret_ty)), Ok actual_ty ->
+                    if arg_ty = actual_ty then Ok ret_ty
+                    else Error (FunArgTyErr (arg_ty, actual_ty))
+                | Ok ty, _ -> Error (FunAppTyErr ty)
+                | Error e, _ -> Error e
+            )
         | If (cond, then_, else_) -> (
             match typecheck env cond with
             | Ok BoolTy -> (
-                match typecheck env then_, typecheck env else_ with
+                let ty_then = typecheck env then_ in
+                let ty_else = typecheck env else_ in
+                match ty_then, ty_else with
                 | Ok ty_then, Ok ty_else when ty_then = ty_else -> Ok ty_then
                 | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))
                 | Error e, _ | _, Error e -> Error e
