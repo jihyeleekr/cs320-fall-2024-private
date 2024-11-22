@@ -92,11 +92,12 @@ let type_of (expr : expr) : (ty, error) result =
             | Error e -> Error e)
         | App (e1, e2) -> (
             match typecheck env e1, typecheck env e2 with
+            | Error e, _ -> Error e
+            | _, Error e -> Error e
             | Ok (FunTy (arg_ty, ret_ty)), Ok actual_ty ->
                 if arg_ty = actual_ty then Ok ret_ty
                 else Error (FunArgTyErr (arg_ty, actual_ty))
             | Ok ty, _ -> Error (FunAppTyErr ty)
-            | Error e, _ -> Error e
         )
         | If (cond, then_, else_) -> (
             match typecheck env cond with
@@ -132,6 +133,7 @@ let type_of (expr : expr) : (ty, error) result =
         )
     in
     typecheck Env.empty expr
+
 
   
 (* Evaluation *)
