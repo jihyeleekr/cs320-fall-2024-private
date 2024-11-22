@@ -10,11 +10,11 @@ exception AssertFail
 (* Desugaring: Convert prog to expr *)
 let desugar (prog : prog) : expr =
     let rec desugar_toplets = function
-      | [] -> Unit 
+      | [] -> Unit  
       | { is_rec; name; args; ty; value } :: rest ->
           let desugared_value =
             List.fold_right
-              (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
+              (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))  
               args
               (desugar_expr value)
           in
@@ -23,13 +23,13 @@ let desugar (prog : prog) : expr =
             name;
             ty;
             value = desugared_value;
-            body = desugar_toplets rest;
+            body = desugar_toplets rest;  
           }
     and desugar_expr = function
       | SLet { is_rec; name; args; ty; value; body } ->
           let desugared_value =
             List.fold_right
-              (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
+              (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))  
               args
               (desugar_expr value)
           in
@@ -38,28 +38,29 @@ let desugar (prog : prog) : expr =
             name;
             ty;
             value = desugared_value;
-            body = desugar_expr body;
+            body = desugar_expr body;  
           }
       | SFun { arg; args; body } ->
           List.fold_right
-            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))
+            (fun (arg, arg_ty) acc -> Fun (arg, arg_ty, acc))  
             (arg :: args)
             (desugar_expr body)
       | SIf (cond, then_, else_) ->
-          If (desugar_expr cond, desugar_expr then_, desugar_expr else_)
+          If (desugar_expr cond, desugar_expr then_, desugar_expr else_)  
       | SApp (e1, e2) ->
-          App (desugar_expr e1, desugar_expr e2)
+          App (desugar_expr e1, desugar_expr e2)  
       | SBop (op, e1, e2) ->
-          Bop (op, desugar_expr e1, desugar_expr e2)
+          Bop (op, desugar_expr e1, desugar_expr e2)  
       | SAssert e ->
-          Assert (desugar_expr e)
-      | SUnit -> Unit
-      | STrue -> True
-      | SFalse -> False
-      | SNum n -> Num n
-      | SVar x -> Var x
+          Assert (desugar_expr e)  
+      | SUnit -> Unit  
+      | STrue -> True  
+      | SFalse -> False  
+      | SNum n -> Num n  
+      | SVar x -> Var x  
     in
     desugar_toplets prog
+  
   
 (* Type checking *)
 let type_of (expr : expr) : (ty, error) result =
@@ -133,7 +134,6 @@ let type_of (expr : expr) : (ty, error) result =
     in
     typecheck Env.empty expr
   
-
 (* Evaluation *)
 let eval (expr : expr) : value =
   let rec eval_expr env expr =
