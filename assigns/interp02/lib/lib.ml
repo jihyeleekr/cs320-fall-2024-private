@@ -82,17 +82,19 @@ let type_of (expr : expr) : (ty, error) result =
               else Error (LetTyErr (expected_ty, actual_ty))
           | Error e -> Error e
         )
-      | Fun (arg, ty_arg, body) ->
+      | Fun (arg, ty_arg, body) -> (
           let env' = Env.add arg ty_arg env in
-          (match typecheck env' body with
+          match typecheck env' body with
           | Ok ty_body -> Ok (FunTy (ty_arg, ty_body))
-          | Error e -> Error e)
+          | Error e -> Error e
+        )
       | App (e1, e2) -> (
           match typecheck env e1, typecheck env e2 with
           | Error e1, _ -> Error e1
           | _, Error e2 -> Error e2
-          | Ok (FunTy (arg_ty, ret_ty)), Ok actual_ty when arg_ty = actual_ty -> Ok ret_ty
-          | Ok (FunTy (arg_ty, _)), Ok actual_ty -> Error (FunArgTyErr (arg_ty, actual_ty))
+          | Ok (FunTy (arg_ty, ret_ty)), Ok actual_ty ->
+              if arg_ty = actual_ty then Ok ret_ty
+              else Error (FunArgTyErr (arg_ty, actual_ty))
           | Ok ty, _ -> Error (FunAppTyErr ty)
         )
       | If (cond, then_, else_) -> (
@@ -101,28 +103,43 @@ let type_of (expr : expr) : (ty, error) result =
               match typecheck env then_, typecheck env else_ with
               | Ok ty_then, Ok ty_else when ty_then = ty_else -> Ok ty_then
               | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))
-              | Error e, _ | _, Error e -> Error e
+              | Error e, _ -> Error e
+              | _, Error e -> Error e
             )
           | Ok ty -> Error (IfCondTyErr ty)
           | Error e -> Error e
         )
-      | Bop (op, e1, e2) -> (
-          match typecheck env e1, typecheck env e2 with
-          | Ok IntTy, Ok IntTy when List.mem op [Add; Sub; Mul; Div; Mod] -> Ok IntTy
-          | Ok IntTy, Ok IntTy when List.mem op [Lt; Lte; Gt; Gte; Eq; Neq] -> Ok BoolTy
-          | Ok BoolTy, Ok BoolTy when List.mem op [And; Or] -> Ok BoolTy
-          | Error e, _ -> Error e
-          | _, Error e -> Error e
-          | Ok _, Ok ty2 -> Error (OpTyErrR (op, IntTy, ty2))
+        | Bop (op, e1, e2) -> (
+            match typecheck env e1, typecheck env e2 with
+            | Error e1, _ -> Error e1
+            | _, Error e2 -> Error e2
+            | Ok IntTy, Ok IntTy when List.mem op [Add; Sub; Mul; Div; Mod] -> Ok IntTy
+            | Ok IntTy, Ok IntTy when List.mem op [Lt; Lte; Gt; Gte; Eq; Neq] -> Ok BoolTy
+            | Ok BoolTy, Ok BoolTy when List.mem op [And; Or] -> Ok BoolTy
+            | Ok ty1, _ when List.mem op [Add; Sub; Mul; Div; Mod] && ty1 <> IntTy ->
+                Error (OpTyErrL (op, IntTy, ty1)) 
+            | _, Ok ty2 when List.mem op [Add; Sub; Mul; Div; Mod] && ty2 <> IntTy ->
+                Error (OpTyErrR (op, IntTy, ty2)) 
+            | Ok ty1, _ when List.mem op [Lt; Lte; Gt; Gte; Eq; Neq] && ty1 <> IntTy ->
+                Error (OpTyErrL (op, IntTy, ty1)) 
+            | _, Ok ty2 when List.mem op [Lt; Lte; Gt; Gte; Eq; Neq] && ty2 <> IntTy ->
+                Error (OpTyErrR (op, IntTy, ty2)) 
+            | Ok ty1, _ when List.mem op [And; Or] && ty1 <> BoolTy ->
+                Error (OpTyErrL (op, BoolTy, ty1)) 
+            | _, Ok ty2 when List.mem op [And; Or] && ty2 <> BoolTy ->
+                Error (OpTyErrR (op, BoolTy, ty2)) 
+            | Ok _, Ok _ -> Error (OpTyErrL (op, IntTy, IntTy)) 
         )
-      | Assert e -> (
-          match typecheck env e with
-          | Ok BoolTy -> Ok UnitTy
-          | Ok ty -> Error (AssertTyErr ty)
-          | Error e -> Error e
-        )
+
+        | Assert e -> (
+            match typecheck env e with
+            | Ok BoolTy -> Ok UnitTy
+            | Ok ty -> Error (AssertTyErr ty)
+            | Error e -> Error e
+            )
     in
     typecheck Env.empty expr
+  
   
   
 
