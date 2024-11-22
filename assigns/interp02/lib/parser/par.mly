@@ -65,8 +65,9 @@ ty:
   | "int" { IntTy }
   | "bool" { BoolTy }
   | "unit" { UnitTy }
-  | "(" t = ty ")" { t }
   | t1 = ty "->" t2 = ty { FunTy(t1, t2) }
+  | "(" t = ty ")" { t }
+
 
 expr:
   | "let" x = VAR args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
@@ -80,7 +81,7 @@ expr:
   | e = expr2 { e }
 
 expr2:
-  | e1 = expr2 bop = bop e2 = expr3
+  | e1 = expr2 bop = bop e2 = expr2
     { SBop(bop, e1, e2) }
   | "assert" e = expr3
     { SAssert e }

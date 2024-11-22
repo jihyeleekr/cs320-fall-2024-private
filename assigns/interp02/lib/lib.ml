@@ -111,19 +111,27 @@ let type_of (expr : expr) : (ty, error) result =
             | Error e -> Error e
         )
         | Bop (op, e1, e2) -> (
-            match typecheck env e1, typecheck env e2 with
-            | Error e, _ -> Error e
-            | _, Error e -> Error e
-            | Ok IntTy, Ok IntTy when List.mem op [Add; Sub; Mul; Div; Mod] -> Ok IntTy
-            | Ok IntTy, Ok IntTy when List.mem op [Lt; Lte; Gt; Gte; Eq; Neq] -> Ok BoolTy
-            | Ok BoolTy, Ok BoolTy when List.mem op [And; Or] -> Ok BoolTy
-            | Ok ty1, _ when List.mem op [Add; Sub; Mul; Div; Mod] -> Error (OpTyErrL (op, IntTy, ty1))
-            | _, Ok ty2 when List.mem op [Add; Sub; Mul; Div; Mod] -> Error (OpTyErrR (op, IntTy, ty2))
-            | Ok ty1, _ when List.mem op [Lt; Lte; Gt; Gte; Eq; Neq] -> Error (OpTyErrL (op, IntTy, ty1))
-            | _, Ok ty2 when List.mem op [Lt; Lte; Gt; Gte; Eq; Neq] -> Error (OpTyErrR (op, IntTy, ty2))
-            | Ok ty1, _ when List.mem op [And; Or] -> Error (OpTyErrL (op, BoolTy, ty1))
-            | _, Ok ty2 when List.mem op [And; Or] -> Error (OpTyErrR (op, BoolTy, ty2))
-            | Ok ty1, Ok ty2 -> Error (OpTyErrL (op, ty1, ty2))
+            match typecheck env e1 with
+            | Error e -> Error e
+            | Ok ty1 -> (
+                match typecheck env e2 with
+                | Error e -> Error e
+                | Ok ty2 -> (
+                    match op with
+                    | Add | Sub | Mul | Div | Mod ->
+                        if ty1 = IntTy && ty2 = IntTy then Ok IntTy
+                        else if ty1 <> IntTy then Error (OpTyErrL (op, IntTy, ty1))
+                        else Error (OpTyErrR (op, IntTy, ty2))
+                    | Lt | Lte | Gt | Gte | Eq | Neq ->
+                        if ty1 = IntTy && ty2 = IntTy then Ok BoolTy
+                        else if ty1 <> IntTy then Error (OpTyErrL (op, IntTy, ty1))
+                        else Error (OpTyErrR (op, IntTy, ty2))
+                    | And | Or ->
+                        if ty1 = BoolTy && ty2 = BoolTy then Ok BoolTy
+                        else if ty1 <> BoolTy then Error (OpTyErrL (op, BoolTy, ty1))
+                        else Error (OpTyErrR (op, BoolTy, ty2))
+                )
+            )
         )
         | Assert e -> (
             match typecheck env e with
@@ -133,6 +141,7 @@ let type_of (expr : expr) : (ty, error) result =
         )
     in
     typecheck Env.empty expr
+
 
 
   
