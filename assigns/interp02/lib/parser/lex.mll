@@ -23,6 +23,8 @@ rule read = parse
 | "true" { TRUE }
 | "false" { FALSE }
 | "assert" { ASSERT }
+| "unit" {UNITTY}
+| "()" {UNIT}
 | '+' { PLUS }
 | '-' { MINUS }
 | '*' { TIMES }
