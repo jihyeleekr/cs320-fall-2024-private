@@ -25,9 +25,9 @@ rule read = parse
 | "false" { FALSE }
 | "assert" { ASSERT }
 | "()" {UNIT}
-| '+' { PLUS }
-| '-' { MINUS }
-| '*' { TIMES }
+| '+' { ADD }
+| '-' { SUB }
+| '*' { MUL }
 | '/' { DIV }
 | "mod" { MOD }
 | '<' { LT }

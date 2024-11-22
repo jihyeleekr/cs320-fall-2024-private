@@ -25,9 +25,9 @@ open Utils
 %token IF "if"
 %token THEN "then"
 %token ELSE "else"
-%token PLUS "+"
-%token TIMES "*"
-%token MINUS "-"
+%token ADD "+"
+%token MUL "*"
+%token SUB "-"
 %token TRUE "true"
 %token FALSE "false"
 %token ASSERT "assert"
@@ -39,12 +39,11 @@ open Utils
 %token UNIT "()"
 %token UNITTY "unit"
 
-%right ARROW
-%right OR 
+%right OR
 %right AND
 %left LT LTE GT GTE EQ NEQ
-%left PLUS MINUS
-%left TIMES DIV MOD
+%left ADD SUB
+%left MUL DIV MOD
 
 %start <Utils.prog> prog
 
@@ -80,20 +79,23 @@ expr:
   { SFun { arg = arg; args = args; body = e } }
   | e = expr2 { e } 
 
+%inline bop:
+  | ADD { Add }
+  | SUB { Sub }
+  | MUL { Mul }
+  | DIV { Div }
+  | MOD { Mod }
+  | LT { Lt }
+  | LTE { Lte }
+  | GT { Gt }
+  | GTE { Gte }
+  | EQ { Eq }
+  | NEQ { Neq }
+  | AND { And }
+  | OR { Or }
+
 expr2:
-  | e1 = expr2 OR e2 = expr2 { SBop(Or, e1, e2) }
-  | e1 = expr2 AND e2 = expr2 { SBop(And, e1, e2) }
-  | e1 = expr2 LT e2 = expr2 { SBop(Lt, e1, e2) }
-  | e1 = expr2 LTE e2 = expr2 { SBop(Lte, e1, e2) }
-  | e1 = expr2 GT e2 = expr2 { SBop(Gt, e1, e2) }
-  | e1 = expr2 GTE e2 = expr2 { SBop(Gte, e1, e2) }
-  | e1 = expr2 EQ e2 = expr2 { SBop(Eq, e1, e2) }
-  | e1 = expr2 NEQ e2 = expr2 { SBop(Neq, e1, e2) }
-  | e1 = expr2 PLUS e2 = expr2 { SBop(Add, e1, e2) }
-  | e1 = expr2 MINUS e2 = expr2 { SBop(Sub, e1, e2) }
-  | e1 = expr2 TIMES e2 = expr2 { SBop(Mul, e1, e2) }
-  | e1 = expr2 DIV e2 = expr2 { SBop(Div, e1, e2) }
-  | e1 = expr2 MOD e2 = expr2 { SBop(Mod, e1, e2) }
+  | e1 = expr2; op = bop; e2 = expr2 { SBop (op, e1, e2) }
   | "assert" e = expr3 { SAssert e }
   | e1 = expr3 es = expr3* { List.fold_left (fun e1 e2 -> SApp(e1, e2)) e1 es }
 
