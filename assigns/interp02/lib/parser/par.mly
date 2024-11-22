@@ -40,7 +40,7 @@ open Utils
 %token UNITTY "unit"
 
 %right ARROW
-%right OR
+%right OR 
 %right AND
 %left LT LTE GT GTE EQ NEQ
 %left PLUS MINUS
@@ -55,9 +55,9 @@ prog:
 
 toplet:
   | "let" x = VAR args = arg* ":" ty = ty "=" e = expr
-    { { is_rec = false; name = x; args = args; ty; value = e } }
+  { { is_rec = false; name = x; args = args; ty; value = e } }
   | "let" "rec" x = VAR arg = arg ; args = arg* ":" ty = ty "=" e = expr
-    { { is_rec = true; name = x ; args = arg :: args; ty; value = e } }
+  { { is_rec = true; name = x; args = arg :: args; ty; value = e } }
 
 arg:
   | "(" x = VAR ":" ty = ty ")" { (x, ty) }
@@ -66,27 +66,37 @@ ty:
   | "int" { IntTy }
   | "bool" { BoolTy }
   | "unit" { UnitTy }
-  | "(" t = ty ")" { t }
   | t1 = ty "->" t2 = ty { FunTy(t1, t2) }
+  | "(" t = ty ")" { t }
 
 expr:
   | "let" x = VAR args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
-    { SLet { is_rec = false; name = x; args = args; ty; value = e1; body = e2 } }
+  { SLet { is_rec = false; name = x; args = args; ty; value = e1; body = e2 } }
   | "let" "rec" x = VAR arg = arg ; args = arg* ":" ty = ty "=" e1 = expr "in" e2 = expr
-    { SLet { is_rec = true; name = x; args = arg :: args; ty; value = e1; body = e2 } }
+  { SLet { is_rec = true; name = x; args = arg :: args; ty; value = e1; body = e2 } }
   | "if" e1 = expr "then" e2 = expr "else" e3 = expr
-    { SIf(e1, e2, e3) }
+  { SIf(e1, e2, e3) }
   | "fun" arg = arg ; args = arg* "->" e = expr
-    { SFun { arg = arg; args = args; body = e } }
-  | e = expr2 { e }
+  { SFun { arg = arg; args = args; body = e } }
+  | e = expr2 { e } 
 
 expr2:
-  | e1 = expr2 bop = bop e2 = expr2
-    { SBop(bop, e1, e2) }
-  | "assert" e = expr3
-    { SAssert e }
-  | e = expr3 es = expr3*
-    { List.fold_left (fun e1 e2 -> SApp (e1, e2)) e es }
+  | e1 = expr2 OR e2 = expr2 { SBop(Or, e1, e2) }
+  | e1 = expr2 AND e2 = expr2 { SBop(And, e1, e2) }
+  | e1 = expr2 LT e2 = expr2 { SBop(Lt, e1, e2) }
+  | e1 = expr2 LTE e2 = expr2 { SBop(Lte, e1, e2) }
+  | e1 = expr2 GT e2 = expr2 { SBop(Gt, e1, e2) }
+  | e1 = expr2 GTE e2 = expr2 { SBop(Gte, e1, e2) }
+  | e1 = expr2 EQ e2 = expr2 { SBop(Eq, e1, e2) }
+  | e1 = expr2 NEQ e2 = expr2 { SBop(Neq, e1, e2) }
+  | e1 = expr2 PLUS e2 = expr2 { SBop(Add, e1, e2) }
+  | e1 = expr2 MINUS e2 = expr2 { SBop(Sub, e1, e2) }
+  | e1 = expr2 TIMES e2 = expr2 { SBop(Mul, e1, e2) }
+  | e1 = expr2 DIV e2 = expr2 { SBop(Div, e1, e2) }
+  | e1 = expr2 MOD e2 = expr2 { SBop(Mod, e1, e2) }
+  | "assert" e = expr3 { SAssert e }
+  | e1 = expr3 es = expr3* { List.fold_left (fun e1 e2 -> SApp(e1, e2)) e1 es }
+
 
 expr3:
   | UNIT { SUnit }
@@ -95,18 +105,3 @@ expr3:
   | n = NUM { SNum n }
   | x = VAR { SVar x }
   | "(" e = expr ")" { e }
-
-bop:
-  | "+" { Add }
-  | "-" { Sub }
-  | "*" { Mul }
-  | "/" { Div }
-  | "mod" { Mod }
-  | "<" { Lt }
-  | "<=" { Lte }
-  | ">" { Gt }
-  | ">=" { Gte }
-  | "=" { Eq }
-  | "<>" { Neq }
-  | "&&" { And }
-  | "||" { Or }
