@@ -111,7 +111,7 @@ let type_of (expr : expr) : (ty, error) result =
                 let ty_else = typecheck env else_ in
                 match ty_then, ty_else with
                 | Ok ty_then, Ok ty_else when ty_then = ty_else -> Ok ty_then
-                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))  (* Correct order *)
+                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))  
                 | Error e, _ -> Error e
                 | _, Error e -> Error e
             )
@@ -188,7 +188,7 @@ let eval (expr : expr) : value =
           | VNum n1, VNum n2, Sub -> VNum (n1 - n2)
           | VNum n1, VNum n2, Mul -> VNum (n1 * n2)
           | VNum n1, VNum n2, Div -> if n2 = 0 then raise DivByZero else VNum (n1 / n2)
-          | VNum n1, VNum n2, Mod -> VNum (n1 mod n2)
+          | VNum n1, VNum n2, Mod -> if n2 = 0 then raise DivByZero else VNum (n1 mod n2)
           | VNum n1, VNum n2, Lt -> VBool (n1 < n2)
           | VNum n1, VNum n2, Lte -> VBool (n1 <= n2)
           | VNum n1, VNum n2, Gt -> VBool (n1 > n2)
