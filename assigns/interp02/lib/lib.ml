@@ -84,10 +84,9 @@ let type_of (expr : expr) : (ty, error) result =
                 if is_rec then Env.add name expected_ty env else env
             in
             match typecheck extended_env value with
-            | Ok actual_ty ->
-                if actual_ty = expected_ty then
-                    typecheck (Env.add name expected_ty extended_env) body
-                else Error (LetTyErr (expected_ty, actual_ty))
+            | Ok actual_ty when actual_ty = expected_ty ->
+                typecheck (Env.add name expected_ty extended_env) body
+            | Ok actual_ty -> Error (LetTyErr (expected_ty, actual_ty))
             | Error e -> Error e
         )
         | Fun (arg, arg_ty, body) ->
@@ -96,45 +95,50 @@ let type_of (expr : expr) : (ty, error) result =
             | Ok body_ty -> Ok (FunTy (arg_ty, body_ty))
             | Error e -> Error e)
         | App (e1, e2) -> (
-            match typecheck env e1, typecheck env e2 with
-            | Error e, _ -> Error e
-            | _, Error e -> Error e
-            | Ok (FunTy (arg_ty, ret_ty)), Ok actual_ty ->
-                if arg_ty = actual_ty then Ok ret_ty
-                else Error (FunArgTyErr (arg_ty, actual_ty))
-            | Ok ty, _ -> Error (FunAppTyErr ty)
+            match typecheck env e1 with
+            | Ok (FunTy (arg_ty, ret_ty)) -> (
+                match typecheck env e2 with
+                | Ok actual_ty when arg_ty = actual_ty -> Ok ret_ty
+                | Ok actual_ty -> Error (FunArgTyErr (arg_ty, actual_ty))
+                | Error e -> Error e
+            )
+            | Ok ty -> Error (FunAppTyErr ty)
+            | Error e -> Error e
         )
         | If (cond, then_, else_) -> (
             match typecheck env cond with
             | Ok BoolTy -> (
-                let ty_then = typecheck env then_ in
-                let ty_else = typecheck env else_ in
-                match ty_then, ty_else with
+                match typecheck env then_, typecheck env else_ with
                 | Ok ty_then, Ok ty_else when ty_then = ty_else -> Ok ty_then
-                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))  
-                | Error e, _ -> Error e
-                | _, Error e -> Error e
+                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))
+                | Error e, _ | _, Error e -> Error e
             )
             | Ok ty -> Error (IfCondTyErr ty)
             | Error e -> Error e
         )
         | Bop (op, e1, e2) -> (
-            match typecheck env e1, typecheck env e2 with
-            | Ok ty1, Ok ty2 -> (
-                match op with
-                | Add | Sub | Mul | Div | Mod when ty1 = IntTy && ty2 = IntTy -> Ok IntTy
-                | Lt | Lte | Gt | Gte | Eq | Neq when ty1 = IntTy && ty2 = IntTy -> Ok BoolTy
-                | And | Or when ty1 = BoolTy && ty2 = BoolTy -> Ok BoolTy
-                | Add | Sub | Mul | Div | Mod when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
-                | Add | Sub | Mul | Div | Mod when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
-                | Lt | Lte | Gt | Gte | Eq | Neq when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
-                | Lt | Lte | Gt | Gte | Eq | Neq when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
-                | And | Or when ty1 <> BoolTy -> Error (OpTyErrL (op, BoolTy, ty1))
-                | And | Or when ty2 <> BoolTy -> Error (OpTyErrR (op, BoolTy, ty2))
-                | _ -> Error (OpTyErrL (op, ty1, ty2))
+            (* Type check the left operand first *)
+            match typecheck env e1 with
+            | Ok ty1 -> (
+                (* Type check the right operand next *)
+                match typecheck env e2 with
+                | Ok ty2 -> (
+                    (* Validate the operator and operand types *)
+                    match op with
+                    | Add | Sub | Mul | Div | Mod when ty1 = IntTy && ty2 = IntTy -> Ok IntTy
+                    | Lt | Lte | Gt | Gte | Eq | Neq when ty1 = IntTy && ty2 = IntTy -> Ok BoolTy
+                    | And | Or when ty1 = BoolTy && ty2 = BoolTy -> Ok BoolTy
+                    | Add | Sub | Mul | Div | Mod when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
+                    | Add | Sub | Mul | Div | Mod when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
+                    | Lt | Lte | Gt | Gte | Eq | Neq when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
+                    | Lt | Lte | Gt | Gte | Eq | Neq when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
+                    | And | Or when ty1 <> BoolTy -> Error (OpTyErrL (op, BoolTy, ty1))
+                    | And | Or when ty2 <> BoolTy -> Error (OpTyErrR (op, BoolTy, ty2))
+                    | _ -> Error (OpTyErrL (op, ty1, ty2))
+                )
+                | Error e -> Error e
             )
-            | Error e, _ -> Error e
-            | _, Error e -> Error e
+            | Error e -> Error e
         )
         | Assert e -> (
             match typecheck env e with
@@ -144,6 +148,7 @@ let type_of (expr : expr) : (ty, error) result =
         )
     in
     typecheck Env.empty expr
+
 
 (* Evaluation *)
 let eval (expr : expr) : value =
