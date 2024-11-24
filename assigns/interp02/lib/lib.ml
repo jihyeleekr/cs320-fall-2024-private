@@ -145,8 +145,6 @@ let type_of (expr : expr) : (ty, error) result =
     in
     typecheck Env.empty expr
 
-
-
 (* Evaluation *)
 let eval (expr : expr) : value =
     let rec eval_expr env expr =
@@ -157,62 +155,60 @@ let eval (expr : expr) : value =
       | False -> VBool false
       | Var x -> Env.find x env
       | Let { is_rec; name; ty = _; value; body } ->
-        let closure_env =
-          if is_rec then
-            match value with
-            | Fun (arg, _, body) ->
-                Env.add name (VClos { name = Some name; arg; body; env }) env
-            | _ ->
-                Env.add name (VClos { name = Some name; arg = ""; body = value; env }) env
-          else env
-        in
-        let v = eval_expr closure_env value in
-        let extended_env = Env.add name v closure_env in
-        eval_expr extended_env body    
+          let closure_env =
+            if is_rec then
+              match value with
+              | Fun (arg, _, body) ->
+                  Env.add name (VClos { name = Some name; arg; body; env }) env
+              | _ ->
+                  Env.add name (VClos { name = Some name; arg = ""; body = value; env }) env
+            else env
+          in
+          let v = eval_expr closure_env value in
+          let extended_env = Env.add name v closure_env in
+          eval_expr extended_env body
       | Fun (arg, _, body) -> VClos { name = None; arg; body; env }
       | App (e1, e2) -> (
-        match eval_expr env e1 with
-        | VClos { name = _; arg; body; env = closure_env } ->
-            let v2 = eval_expr env e2 in
-            let extended_env = Env.add arg v2 closure_env in
-            eval_expr extended_env body
-        | _ -> assert false
-    )
-        | If (cond, then_, else_) -> (
-            match eval_expr env cond with
-            | VBool b ->
-                if b then eval_expr env then_ else eval_expr env else_
-            | _ -> assert false
+          match eval_expr env e1 with
+          | VClos { name = _; arg; body; env = closure_env } ->
+              let v2 = eval_expr env e2 in
+              let extended_env = Env.add arg v2 closure_env in
+              eval_expr extended_env body
+          | _ -> assert false
+        )
+      | If (cond, then_, else_) -> (
+          match eval_expr env cond with
+          | VBool b ->
+              if b then eval_expr env then_ else eval_expr env else_
+          | _ -> assert false
         )
       | Bop (op, e1, e2) ->
           let v1 = eval_expr env e1 in
           let v2 = eval_expr env e2 in
-          begin match (v1, v2, op) with
-          | VNum n1, VNum n2, Add -> VNum (n1 + n2)
-          | VNum n1, VNum n2, Sub -> VNum (n1 - n2)
-          | VNum n1, VNum n2, Mul -> VNum (n1 * n2)
-          | VNum n1, VNum n2, Div -> if n2 = 0 then raise DivByZero else VNum (n1 / n2)
-          | VNum n1, VNum n2, Mod -> if n2 = 0 then raise DivByZero else VNum (n1 mod n2)
-          | VNum n1, VNum n2, Lt -> VBool (n1 < n2)
-          | VNum n1, VNum n2, Lte -> VBool (n1 <= n2)
-          | VNum n1, VNum n2, Gt -> VBool (n1 > n2)
-          | VNum n1, VNum n2, Gte -> VBool (n1 >= n2)
-          | VNum n1, VNum n2, Eq -> VBool (n1 = n2)
-          | VNum n1, VNum n2, Neq -> VBool (n1 <> n2)
-          | VBool b1, VBool b2, And -> VBool (b1 && b2)
-          | VBool b1, VBool b2, Or -> VBool (b1 || b2)
+          (match (v1, v2, op) with
+          | (VNum n1, VNum n2, Add) -> VNum (n1 + n2)
+          | (VNum n1, VNum n2, Sub) -> VNum (n1 - n2)
+          | (VNum n1, VNum n2, Mul) -> VNum (n1 * n2)
+          | (VNum n1, VNum n2, Div) -> VNum (n1 / n2)
+          | (VNum n1, VNum n2, Mod) -> VNum (n1 mod n2)
+          | (VNum n1, VNum n2, Lt) -> VBool (n1 < n2)
+          | (VNum n1, VNum n2, Lte) -> VBool (n1 <= n2)
+          | (VNum n1, VNum n2, Gt) -> VBool (n1 > n2)
+          | (VNum n1, VNum n2, Gte) -> VBool (n1 >= n2)
+          | (VNum n1, VNum n2, Eq) -> VBool (n1 = n2)
+          | (VNum n1, VNum n2, Neq) -> VBool (n1 <> n2)
+          | (VBool b1, VBool b2, And) -> VBool (b1 && b2)
+          | (VBool b1, VBool b2, Or) -> VBool (b1 || b2)
+          | _ -> assert false)
+      | Assert e -> (
+          match eval_expr env e with
+          | VBool b ->
+              if b then VUnit else raise AssertFail
           | _ -> assert false
-          end
-        | Assert e -> (
-        match eval_expr env e with
-        | VBool b ->
-            if b then VUnit else raise AssertFail
-        | _ -> assert false
         )
     in
     eval_expr Env.empty expr
   
-
   let interp (input : string) : (value, error) result =
     match parse input with
     | Some prog -> (
