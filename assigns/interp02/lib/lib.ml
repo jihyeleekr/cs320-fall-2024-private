@@ -117,13 +117,10 @@ let type_of (expr : expr) : (ty, error) result =
             | Error e -> Error e
         )
         | Bop (op, e1, e2) -> (
-            (* Type-check left operand first *)
             match typecheck env e1 with
             | Ok ty1 -> (
-                (* Type-check right operand next *)
                 match typecheck env e2 with
                 | Ok ty2 -> (
-                    (* Validate operator and operand types *)
                     match op with
                     | Add | Sub | Mul | Div | Mod when ty1 = IntTy && ty2 = IntTy -> Ok IntTy
                     | Lt | Lte | Gt | Gte | Eq | Neq when ty1 = IntTy && ty2 = IntTy -> Ok BoolTy
@@ -148,7 +145,6 @@ let type_of (expr : expr) : (ty, error) result =
         )
     in
     typecheck Env.empty expr
-
 
 
 (* Evaluation *)
@@ -184,7 +180,8 @@ let eval (expr : expr) : value =
         )
         | If (cond, then_, else_) -> (
             match eval_expr env cond with
-            | VBool b -> if b then eval_expr env then_ else eval_expr env else_
+            | VBool true -> eval_expr env then_
+            | VBool false -> eval_expr env else_
             | _ -> assert false
         )
         | Bop (op, e1, e2) -> (
@@ -221,13 +218,12 @@ let eval (expr : expr) : value =
         )
         | Assert e -> (
             match eval_expr env e with
-            | VBool b -> if b then VUnit else raise AssertFail
+            | VBool true -> VUnit
+            | VBool false -> raise AssertFail
             | _ -> assert false
         )
     in
     eval_expr Env.empty expr
-
-  
 
   let interp (input : string) : (value, error) result =
     match parse input with
