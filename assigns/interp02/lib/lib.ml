@@ -154,41 +154,39 @@ let eval (expr : expr) : value =
         | Num n -> VNum n
         | True -> VBool true
         | False -> VBool false
-        | Var x -> (
-            match Env.find_opt x env with
-            | Some v -> v
-            | _ -> assert false  
-        )
+        | Var x -> Env.find x env
         | Let { is_rec; name; ty = _; value; body } ->
             let extended_env =
                 if is_rec then
-                    match value with
-                    | Fun (arg, _, body) ->
-                        let closure =
-                            VClos { name = Some name; arg; body; env = Env.add name VUnit env }
-                        in
-                        Env.add name closure env
-                    | _ ->
-                        let gensym_arg = gensym () in
-                        let body_closure = Fun (gensym_arg, UnitTy, value) in
-                        let closure =
-                            VClos { name = Some name; arg = gensym_arg; body = body_closure; env }
-                        in
-                        Env.add name closure env
+                    let closure =
+                        match value with
+                        | Fun (arg, _, body) -> VClos { name = Some name; arg; body; env }
+                        | _ ->
+                            let gensym_arg = gensym () in
+                            let wrapped_body = Fun (gensym_arg, UnitTy, value) in
+                            VClos { name = Some name; arg = gensym_arg; body = wrapped_body; env }
+                    in
+                    Env.add name closure env
                 else
-                    env
+                    let v = eval_expr env value in
+                    Env.add name v env
             in
-            let v = eval_expr extended_env value in
-            let final_env = Env.add name v extended_env in
-            eval_expr final_env body
+            eval_expr extended_env body
         | Fun (arg, _, body) -> VClos { name = None; arg; body; env }
         | App (e1, e2) -> (
             match eval_expr env e1 with
-            | VClos { name = _; arg; body; env = closure_env } ->
+            | VClos { name = Some fname; arg; body; env = closure_env } ->
+                let v2 = eval_expr env e2 in
+                let extended_env =
+                    Env.add fname (VClos { name = Some fname; arg; body; env = closure_env })
+                        (Env.add arg v2 closure_env)
+                in
+                eval_expr extended_env body
+            | VClos { name = None; arg; body; env = closure_env } ->
                 let v2 = eval_expr env e2 in
                 let extended_env = Env.add arg v2 closure_env in
                 eval_expr extended_env body
-            | _ -> assert false 
+            | _ -> assert false
         )
         | If (cond, then_, else_) -> (
             match eval_expr env cond with
@@ -236,9 +234,6 @@ let eval (expr : expr) : value =
         )
     in
     eval_expr Env.empty expr
-
-
-
 
   let interp (input : string) : (value, error) result =
     match parse input with
