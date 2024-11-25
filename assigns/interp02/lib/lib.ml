@@ -99,7 +99,7 @@ let type_of (expr : expr) : (ty, error) result =
             | Ok (FunTy (arg_ty, ret_ty)) -> (
                 match typecheck env e2 with
                 | Ok actual_ty when arg_ty = actual_ty -> Ok ret_ty
-                | Ok actual_ty -> Error (FunArgTyErr (actual_ty, arg_ty))
+                | Ok actual_ty -> Error (FunArgTyErr (arg_ty, actual_ty))
                 | Error e -> Error e
             )
             | Ok ty -> Error (FunAppTyErr ty)
@@ -110,7 +110,7 @@ let type_of (expr : expr) : (ty, error) result =
             | Ok BoolTy -> (
                 match typecheck env then_, typecheck env else_ with
                 | Ok ty_then, Ok ty_else when ty_then = ty_else -> Ok ty_then
-                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_then, ty_else))
+                | Ok ty_then, Ok ty_else -> Error (IfTyErr (ty_else, ty_then))
                 | Error e, _ | _, Error e -> Error e
             )
             | Ok ty -> Error (IfCondTyErr ty)
