@@ -157,21 +157,30 @@ let eval (expr : expr) : value =
         | Var x -> (
             match Env.find_opt x env with
             | Some v -> v
-            | None -> assert false  
+            | _ -> assert false  
         )
         | Let { is_rec; name; ty = _; value; body } ->
-            let closure_env =
+            let extended_env =
                 if is_rec then
                     match value with
                     | Fun (arg, _, body) ->
-                        Env.add name (VClos { name = Some name; arg; body; env }) env
+                        let closure =
+                            VClos { name = Some name; arg; body; env = Env.add name VUnit env }
+                        in
+                        Env.add name closure env
                     | _ ->
-                        Env.add name (VClos { name = Some name; arg = "_"; body = value; env }) env
-                else env
+                        let gensym_arg = gensym () in
+                        let body_closure = Fun (gensym_arg, UnitTy, value) in
+                        let closure =
+                            VClos { name = Some name; arg = gensym_arg; body = body_closure; env }
+                        in
+                        Env.add name closure env
+                else
+                    env
             in
-            let v = eval_expr closure_env value in
-            let extended_env = Env.add name v closure_env in
-            eval_expr extended_env body
+            let v = eval_expr extended_env value in
+            let final_env = Env.add name v extended_env in
+            eval_expr final_env body
         | Fun (arg, _, body) -> VClos { name = None; arg; body; env }
         | App (e1, e2) -> (
             match eval_expr env e1 with
@@ -219,8 +228,6 @@ let eval (expr : expr) : value =
                 | _ -> assert false 
             )
         )
-
-        (* Assertions *)
         | Assert e -> (
             match eval_expr env e with
             | VBool true -> VUnit
