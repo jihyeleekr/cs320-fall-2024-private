@@ -99,7 +99,7 @@ let type_of (expr : expr) : (ty, error) result =
             | Ok (FunTy (arg_ty, ret_ty)) -> (
                 match typecheck env e2 with
                 | Ok actual_ty when arg_ty = actual_ty -> Ok ret_ty
-                | Ok actual_ty -> Error (FunArgTyErr (arg_ty, actual_ty))
+                | Ok actual_ty -> Error (FunArgTyErr (actual_ty, arg_ty))
                 | Error e -> Error e
             )
             | Ok ty -> Error (FunAppTyErr ty)
@@ -151,7 +151,6 @@ let type_of (expr : expr) : (ty, error) result =
 let eval (expr : expr) : value =
     let rec eval_expr env expr =
         match expr with
-        (* Literals *)
         | Unit -> VUnit
         | Num n -> VNum n
         | True -> VBool true
@@ -164,8 +163,7 @@ let eval (expr : expr) : value =
                     | Fun (arg, _, body) ->
                         Env.add name (VClos { name = Some name; arg; body; env }) env
                     | _ ->
-                        let body_closure = Fun ("_", UnitTy, value) in
-                        Env.add name (VClos { name = Some name; arg = "_"; body = body_closure; env }) env
+                        Env.add name (VClos { name = Some name; arg = ""; body = value; env }) env
                 else env
             in
             let v = eval_expr closure_env value in
