@@ -155,7 +155,7 @@ let eval (expr : expr) : value =
         | Num n -> VNum n
         | True -> VBool true
         | False -> VBool false
-        | Var x -> Env.find x env
+        | Var x -> Env.find x env 
         | Let { is_rec; name; ty = _; value; body } ->
             let closure_env =
                 if is_rec then
@@ -163,7 +163,7 @@ let eval (expr : expr) : value =
                     | Fun (arg, _, body) ->
                         Env.add name (VClos { name = Some name; arg; body; env }) env
                     | _ ->
-                        Env.add name (VClos { name = Some name; arg = ""; body = value; env }) env
+                        Env.add name (VClos { name = Some name; arg = "_"; body = value; env }) env
                 else env
             in
             let v = eval_expr closure_env value in
@@ -176,27 +176,27 @@ let eval (expr : expr) : value =
                 let v2 = eval_expr env e2 in
                 let extended_env = Env.add arg v2 closure_env in
                 eval_expr extended_env body
-            | _ -> assert false
+            | _ -> assert false 
         )
         | If (cond, then_, else_) -> (
             match eval_expr env cond with
             | VBool true -> eval_expr env then_
             | VBool false -> eval_expr env else_
-            | _ -> assert false
+            | _ -> assert false 
         )
         | Bop (op, e1, e2) -> (
             match op with
             | And -> (
                 match eval_expr env e1 with
-                | VBool false -> VBool false
-                | VBool true -> eval_expr env e2
-                | _ -> assert false
+                | VBool false -> VBool false 
+                | VBool true -> eval_expr env e2 
+                | _ -> assert false 
             )
             | Or -> (
                 match eval_expr env e1 with
-                | VBool true -> VBool true
-                | VBool false -> eval_expr env e2
-                | _ -> assert false
+                | VBool true -> VBool true 
+                | VBool false -> eval_expr env e2 
+                | _ -> assert false 
             )
             | _ -> (
                 let v1 = eval_expr env e1 in
@@ -213,17 +213,20 @@ let eval (expr : expr) : value =
                 | (VNum n1, VNum n2, Gte) -> VBool (n1 >= n2)
                 | (VNum n1, VNum n2, Eq) -> VBool (n1 = n2)
                 | (VNum n1, VNum n2, Neq) -> VBool (n1 <> n2)
-                | _ -> assert false
+                | _ -> assert false 
             )
         )
+
+        (* Assertions *)
         | Assert e -> (
             match eval_expr env e with
             | VBool true -> VUnit
             | VBool false -> raise AssertFail
-            | _ -> assert false
+            | _ -> assert false 
         )
     in
     eval_expr Env.empty expr
+
 
 
 
