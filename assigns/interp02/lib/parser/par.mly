@@ -39,6 +39,7 @@ open Utils
 %token UNIT "()"
 %token UNITTY "unit"
 
+%right ARROW
 %right OR
 %right AND
 %left LT LTE GT GTE EQ NEQ

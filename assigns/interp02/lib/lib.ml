@@ -146,7 +146,6 @@ let type_of (expr : expr) : (ty, error) result =
     in
     typecheck Env.empty expr
 
-
 (* Evaluation *)
 let eval (expr : expr) : value =
     let rec eval_expr env expr =
@@ -155,7 +154,11 @@ let eval (expr : expr) : value =
         | Num n -> VNum n
         | True -> VBool true
         | False -> VBool false
-        | Var x -> Env.find x env 
+        | Var x -> (
+            match Env.find_opt x env with
+            | Some v -> v
+            | None -> assert false  
+        )
         | Let { is_rec; name; ty = _; value; body } ->
             let closure_env =
                 if is_rec then
