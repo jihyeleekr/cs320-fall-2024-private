@@ -163,7 +163,8 @@ let eval (expr : expr) : value =
                     | Fun (arg, _, body) ->
                         Env.add name (VClos { name = Some name; arg; body; env }) env
                     | _ ->
-                        Env.add name (VClos { name = Some name; arg = ""; body = value; env }) env
+                        let body_closure = Fun ("_", UnitTy, value) in
+                        Env.add name (VClos { name = Some name; arg = "_"; body = body_closure; env }) env
                 else env
             in
             let v = eval_expr closure_env value in
@@ -224,6 +225,7 @@ let eval (expr : expr) : value =
         )
     in
     eval_expr Env.empty expr
+
 
   let interp (input : string) : (value, error) result =
     match parse input with
