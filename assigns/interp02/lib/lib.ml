@@ -125,12 +125,6 @@ let type_of (expr : expr) : (ty, error) result =
                     | Add | Sub | Mul | Div | Mod when ty1 = IntTy && ty2 = IntTy -> Ok IntTy
                     | Lt | Lte | Gt | Gte | Eq | Neq when ty1 = IntTy && ty2 = IntTy -> Ok BoolTy
                     | And | Or when ty1 = BoolTy && ty2 = BoolTy -> Ok BoolTy
-                    | Add | Sub | Mul | Div | Mod when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
-                    | Add | Sub | Mul | Div | Mod when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
-                    | Lt | Lte | Gt | Gte | Eq | Neq when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
-                    | Lt | Lte | Gt | Gte | Eq | Neq when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
-                    | And | Or when ty1 <> BoolTy -> Error (OpTyErrL (op, BoolTy, ty1))
-                    | And | Or when ty2 <> BoolTy -> Error (OpTyErrR (op, BoolTy, ty2))
                     | _ -> Error (OpTyErrL (op, ty1, ty2))
                 )
                 | Error e -> Error e
@@ -147,10 +141,12 @@ let type_of (expr : expr) : (ty, error) result =
     typecheck Env.empty expr
 
 
+
 (* Evaluation *)
 let eval (expr : expr) : value =
     let rec eval_expr env expr =
         match expr with
+        (* Literals *)
         | Unit -> VUnit
         | Num n -> VNum n
         | True -> VBool true
@@ -225,6 +221,7 @@ let eval (expr : expr) : value =
         )
     in
     eval_expr Env.empty expr
+
 
 
   let interp (input : string) : (value, error) result =
