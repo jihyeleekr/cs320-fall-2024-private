@@ -1,6 +1,5 @@
 
-let add (x : int) (y : int) : int = x + y
-let test : int = add 5
+let test : int = (1 + (1 / true)) * 1
 
 
 

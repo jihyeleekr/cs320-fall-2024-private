@@ -81,19 +81,18 @@ let type_of (expr : expr) : (ty, error) result =
         )
         | Let { is_rec; name; ty = expected_ty; value; body } -> (
             if is_rec then (
-            (* Recursive: Extend env before checking the value *)
-            let extended_env = Env.add name expected_ty env in
-            match typecheck extended_env value with
-            | Ok actual_ty when actual_ty = expected_ty ->
-                typecheck (Env.add name expected_ty extended_env) body
-            | Ok actual_ty -> Error (LetTyErr (expected_ty, actual_ty))
-            | Error e -> Error e
+                let extended_env = Env.add name expected_ty env in
+                match typecheck extended_env value with
+                | Ok actual_ty when actual_ty = expected_ty ->
+                    typecheck (Env.add name expected_ty extended_env) body
+                | Ok actual_ty -> Error (LetTyErr (expected_ty, actual_ty))
+                | Error e -> Error e
             ) else (
-            match typecheck env value with
-            | Ok actual_ty when actual_ty = expected_ty ->
-                typecheck (Env.add name actual_ty env) body
-            | Ok actual_ty -> Error (LetTyErr (expected_ty, actual_ty))
-            | Error e -> Error e
+                match typecheck env value with
+                | Ok actual_ty when actual_ty = expected_ty ->
+                    typecheck (Env.add name actual_ty env) body
+                | Ok actual_ty -> Error (LetTyErr (expected_ty, actual_ty))
+                | Error e -> Error e
             )
         )
         | Fun (arg, arg_ty, body) ->
@@ -113,19 +112,22 @@ let type_of (expr : expr) : (ty, error) result =
             | Error e -> Error e
         )
         | If (cond, then_, else_) -> (
+            (* Step 1: Check the condition's type *)
             match typecheck env cond with
             | Ok BoolTy -> (
+                (* Step 2: Check the type of the `then` branch *)
                 match typecheck env then_ with
                 | Ok ty_then -> (
+                    (* Step 3: Check the type of the `else` branch *)
                     match typecheck env else_ with
                     | Ok ty_else when ty_then = ty_else -> Ok ty_then
-                    | Ok ty_else -> Error (IfTyErr (ty_then, ty_else))
-                    | Error e -> Error e
+                    | Ok ty_else -> Error (IfTyErr (ty_then, ty_else)) (* Step 4: Mismatch between then/else *)
+                    | Error e -> Error e (* Propagate error from else branch *)
                 )
-                | Error e -> Error e
+                | Error e -> Error e (* Propagate error from then branch *)
             )
-            | Ok ty -> Error (IfCondTyErr ty)
-            | Error e -> Error e
+            | Ok ty -> Error (IfCondTyErr ty) (* Step 5: Condition is not BoolTy *)
+            | Error e -> Error e (* Propagate error from condition *)
         )
         | Bop (op, e1, e2) -> (
             match typecheck env e1 with
@@ -156,8 +158,8 @@ let type_of (expr : expr) : (ty, error) result =
         )
     in
     typecheck Env.empty expr
-  
 
+  
 (* Evaluation *)
 let eval (expr : expr) : value =
     let rec eval_expr env expr =
