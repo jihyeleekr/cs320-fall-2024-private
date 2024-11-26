@@ -127,26 +127,22 @@ let type_of (expr : expr) : (ty, error) result =
             | Error e -> Error e
         )
         | Bop (op, e1, e2) -> (
+            let (expected_ty1, expected_ty2, result_ty) = match op with
+            | Add | Sub | Mul | Div | Mod -> (IntTy, IntTy, IntTy)
+            | Lt | Lte | Gt | Gte | Eq | Neq -> (IntTy, IntTy, BoolTy)
+            | And | Or -> (BoolTy, BoolTy, BoolTy)
+            in
             match typecheck env e1 with
-            | Ok ty1 -> (
+            | Error e -> Error e 
+            | Ok ty1 when ty1 <> expected_ty1 -> Error (OpTyErrL (op, expected_ty1, ty1))
+            | Ok _ -> (
                 match typecheck env e2 with
-                | Ok ty2 -> (
-                    match op with
-                    | Add | Sub | Mul | Div | Mod when ty1 = IntTy && ty2 = IntTy -> Ok IntTy
-                    | Lt | Lte | Gt | Gte | Eq | Neq when ty1 = IntTy && ty2 = IntTy -> Ok BoolTy
-                    | And | Or when ty1 = BoolTy && ty2 = BoolTy -> Ok BoolTy
-                    | Add | Sub | Mul | Div | Mod when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
-                    | Add | Sub | Mul | Div | Mod when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
-                    | Lt | Lte | Gt | Gte | Eq | Neq when ty1 <> IntTy -> Error (OpTyErrL (op, IntTy, ty1))
-                    | Lt | Lte | Gt | Gte | Eq | Neq when ty2 <> IntTy -> Error (OpTyErrR (op, IntTy, ty2))
-                    | And | Or when ty1 <> BoolTy -> Error (OpTyErrL (op, BoolTy, ty1))
-                    | And | Or when ty2 <> BoolTy -> Error (OpTyErrR (op, BoolTy, ty2))
-                    | _ -> Error (OpTyErrL (op, ty1, ty2))
-                )
-                | Error e -> Error e
+                | Error e -> Error e 
+                | Ok ty2 when ty2 <> expected_ty2 -> Error (OpTyErrR (op, expected_ty2, ty2))
+                | Ok _ -> Ok result_ty 
             )
-            | Error e -> Error e
         )
+
         | Assert e -> (
             match typecheck env e with
             | Ok BoolTy -> Ok UnitTy
@@ -155,8 +151,6 @@ let type_of (expr : expr) : (ty, error) result =
         )
     in
     typecheck Env.empty expr
-
-
   
 (* Evaluation *)
 let eval (expr : expr) : value =
