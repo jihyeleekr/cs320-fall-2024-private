@@ -112,22 +112,19 @@ let type_of (expr : expr) : (ty, error) result =
             | Error e -> Error e
         )
         | If (cond, then_, else_) -> (
-            (* Step 1: Check the condition's type *)
             match typecheck env cond with
             | Ok BoolTy -> (
-                (* Step 2: Check the type of the `then` branch *)
                 match typecheck env then_ with
                 | Ok ty_then -> (
-                    (* Step 3: Check the type of the `else` branch *)
                     match typecheck env else_ with
                     | Ok ty_else when ty_then = ty_else -> Ok ty_then
-                    | Ok ty_else -> Error (IfTyErr (ty_then, ty_else)) (* Step 4: Mismatch between then/else *)
-                    | Error e -> Error e (* Propagate error from else branch *)
+                    | Ok ty_else -> Error (IfTyErr (ty_then, ty_else))
+                    | Error e -> Error e
                 )
-                | Error e -> Error e (* Propagate error from then branch *)
+                | Error e -> Error e
             )
-            | Ok ty -> Error (IfCondTyErr ty) (* Step 5: Condition is not BoolTy *)
-            | Error e -> Error e (* Propagate error from condition *)
+            | Ok ty -> Error (IfCondTyErr ty)
+            | Error e -> Error e
         )
         | Bop (op, e1, e2) -> (
             match typecheck env e1 with
@@ -158,6 +155,7 @@ let type_of (expr : expr) : (ty, error) result =
         )
     in
     typecheck Env.empty expr
+
 
   
 (* Evaluation *)
