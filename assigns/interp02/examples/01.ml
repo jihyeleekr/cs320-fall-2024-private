@@ -1,5 +1,9 @@
 
-let _ : bool = 1 + 1 && true + true
+
+let d : bool = 7 < 10 
+
+let test : unit = assert(d = false)
+
 
 
 
