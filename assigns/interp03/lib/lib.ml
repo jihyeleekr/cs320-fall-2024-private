@@ -84,87 +84,71 @@ let rec type_of env expr =
     let arg_ty = TVar (gensym ()) in
     let res_ty = TVar (gensym ()) in
     (match type_of env f, type_of env arg with
-     | Some (Forall (_, f_ty)), Some (Forall (_, arg_ty_actual)) ->
-         let constraints = [(f_ty, TFun (arg_ty, res_ty)); (arg_ty, arg_ty_actual)] in
+     | Some (Forall (_, f_ty)), Some (Forall (_, actual_arg_ty)) ->
+         (* Unify f_ty with a function type *)
+         let constraints = [(f_ty, TFun (arg_ty, res_ty)); (arg_ty, actual_arg_ty)] in
          (match unify res_ty constraints with
-          | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
+          | Some (Forall (_, unified_res_ty)) ->
+              let final_res_ty = apply_subst [] unified_res_ty in
+              Some (Forall ([], final_res_ty))
           | None -> None)
      | _ -> None)
-  | Let { is_rec; name; value; body } ->
-    (match type_of env value with
-     | Some (Forall (_, value_ty)) ->
-         let env' =
-           if is_rec then
-             let placeholder_ty = TVar (gensym ()) in
-             let env_rec = Env.add name (Forall ([], placeholder_ty)) env in
-             (match type_of env_rec value with
-              | Some (Forall (_, refined_ty)) ->
-                  Env.add name (Forall ([], refined_ty)) env
-              | None -> env_rec)
-           else
-             Env.add name (Forall (free_vars value_ty, value_ty)) env
-         in
-         type_of env' body
-     | None -> None)
   | If (cond, e1, e2) ->
     (match type_of env cond, type_of env e1, type_of env e2 with
      | Some (Forall (_, TBool)), Some (Forall (_, t1)), Some (Forall (_, t2)) ->
-         let constraints = [(t1, t2)] in
-         (match unify t1 constraints with
-          | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-          | None -> None)
+       let constraints = [(t1, t2)] in
+       (match unify t1 constraints with
+        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
+        | None -> None)
      | _ -> None)
   | Bop (op, e1, e2) ->
-    let operand_ty, result_ty =
+    let result_ty, operand_ty =
       match op with
       | Add | Sub | Mul | Div | Mod -> (TInt, TInt)
       | AddF | SubF | MulF | DivF | PowF -> (TFloat, TFloat)
-      | _ -> (TBool, TBool)
+      | _ -> (TBool, TVar (gensym ())) (* Logical and comparison operators *)
     in
     (match type_of env e1, type_of env e2 with
      | Some (Forall (_, t1)), Some (Forall (_, t2)) ->
-         let constraints = [(t1, operand_ty); (t2, operand_ty)] in
-         (match unify result_ty constraints with
-          | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-          | None -> None)
+       let constraints = [(t1, operand_ty); (t2, operand_ty)] in
+       (match unify result_ty constraints with
+        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
+        | None -> None)
      | _ -> None)
   | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
     let elem_ty = TVar (gensym ()) in
     let list_ty = TList elem_ty in
-    (match type_of env matched,
+    (match type_of env matched, 
            type_of (Env.add hd_name (Forall ([], elem_ty))
-                   (Env.add tl_name (Forall ([], list_ty)) env)) cons_case,
+                   (Env.add tl_name (Forall ([], list_ty)) env)) cons_case, 
            type_of env nil_case with
      | Some (Forall (_, t_matched)), Some (Forall (_, t_cons)), Some (Forall (_, t_nil)) ->
-         let constraints = [(t_matched, list_ty); (t_cons, t_nil)] in
-         (match unify t_cons constraints with
-          | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-          | None -> None)
+       let constraints = [(t_matched, list_ty); (t_cons, t_nil)] in
+       (match unify t_cons constraints with
+        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
+        | None -> None)
      | _ -> None)
   | OptMatch { matched; some_name; some_case; none_case } ->
     let elem_ty = TVar (gensym ()) in
     let opt_ty = TOption elem_ty in
-    (match type_of env matched,
-           type_of (Env.add some_name (Forall ([], elem_ty)) env) some_case,
-           type_of env none_case with
+    (match type_of env matched, type_of (Env.add some_name (Forall ([], elem_ty)) env) some_case, type_of env none_case with
      | Some (Forall (_, t_matched)), Some (Forall (_, t_some)), Some (Forall (_, t_none)) ->
-         let constraints = [(t_matched, opt_ty); (t_some, t_none)] in
-         (match unify t_some constraints with
-          | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-          | None -> None)
+       let constraints = [(t_matched, opt_ty); (t_some, t_none)] in
+       (match unify t_some constraints with
+        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
+        | None -> None)
      | _ -> None)
   | PairMatch { matched; fst_name; snd_name; case } ->
     let fst_ty = TVar (gensym ()) in
     let snd_ty = TVar (gensym ()) in
     let pair_ty = TPair (fst_ty, snd_ty) in
-    (match type_of env matched,
-           type_of (Env.add fst_name (Forall ([], fst_ty))
-                   (Env.add snd_name (Forall ([], snd_ty)) env)) case with
+    (match type_of env matched, type_of (Env.add fst_name (Forall ([], fst_ty))
+                                        (Env.add snd_name (Forall ([], snd_ty)) env)) case with
      | Some (Forall (_, t_matched)), Some (Forall (_, t_case)) ->
-         let constraints = [(t_matched, pair_ty)] in
-         (match unify t_case constraints with
-          | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-          | None -> None)
+       let constraints = [(t_matched, pair_ty)] in
+       (match unify t_case constraints with
+        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
+        | None -> None)
      | _ -> None)
   | _ -> None
 
@@ -268,10 +252,7 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
            let rec_env = Env.add name (VClos { name = Some name; arg; body = body_fun; env }) env in
            eval_expr rec_env body
        | _ -> raise RecWithoutArg )
-  | _ -> assert false 
-
-
-
+  | _ -> assert false
 
 let type_check =
   let rec go ctxt = function
