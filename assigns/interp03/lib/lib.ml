@@ -134,8 +134,8 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Add, VInt n1, VInt n2) -> VInt (n1 + n2)
        | (Sub, VInt n1, VInt n2) -> VInt (n1 - n2)
        | (Mul, VInt n1, VInt n2) -> VInt (n1 * n2)
-       | (Div, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt(n1 / n2)
-       | (Mod, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt(n1 mod n2)
+       | (Div, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt (n1 / n2)
+       | (Mod, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt (n1 mod n2)
        | (AddF, VFloat f1, VFloat f2) -> VFloat (f1 +. f2)
        | (SubF, VFloat f1, VFloat f2) -> VFloat (f1 -. f2)
        | (MulF, VFloat f1, VFloat f2) -> VFloat (f1 *. f2)
@@ -153,6 +153,8 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Gt, v1, v2) -> VBool (v1 > v2)
        | (Gte, VClos _, _) | (Gte, _, VClos _) -> raise CompareFunVals
        | (Gte, v1, v2) -> VBool (v1 >= v2)
+       | (And, VBool b1, _) -> if not b1 then VBool false else eval_expr env e2
+       | (Or, VBool b1, _) -> if b1 then VBool true else eval_expr env e2
        | _ -> assert false)
   | If (cond, then_branch, else_branch) ->
       (match eval_expr env cond with
@@ -176,6 +178,7 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
            eval_expr rec_env body
        | _ -> raise RecWithoutArg)
   | _ -> assert false
+
 
 let type_check =
   let rec go ctxt = function
