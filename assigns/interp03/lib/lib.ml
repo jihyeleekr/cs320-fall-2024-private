@@ -149,6 +149,12 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Neq, v1, v2) -> VBool (v1 <> v2)
        | (Lt, VClos _, _) | (Lt, _, VClos _) -> raise CompareFunVals
        | (Lt, v1, v2) -> VBool (v1 < v2)
+       | (Lte, VClos _, _) | (Lte, _, VClos _) -> raise CompareFunVals
+       | (Lte, v1, v2) -> VBool (v1 <= v2)
+       | (Gt, VClos _, _) | (Gt, _, VClos _) -> raise CompareFunVals
+       | (Gt, v1, v2) -> VBool (v1 > v2)
+       | (Gte, VClos _, _) | (Gte, _, VClos _) -> raise CompareFunVals
+       | (Gte, v1, v2) -> VBool (v1 >= v2)
        | _ -> assert false)
   | If (cond, then_branch, else_branch) ->
       (match eval_expr env cond with
@@ -172,9 +178,6 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
            eval_expr rec_env body
        | _ -> raise RecWithoutArg)
   | _ -> assert false
-
-
-
 
 let type_check =
   let rec go ctxt = function
