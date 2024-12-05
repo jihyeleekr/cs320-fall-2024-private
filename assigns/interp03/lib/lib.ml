@@ -1,6 +1,7 @@
 open Utils
 include My_parser
 
+(* Unify Function *)
 let unify (ty : ty) (constrs : constr list) : ty_scheme option =
   let rec list_exists pred lst =
     match lst with
@@ -63,93 +64,54 @@ let unify (ty : ty) (constrs : constr list) : ty_scheme option =
       Some (Forall ([], generalized_ty))
   | None -> None
 
-
-
-
-  let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
-    match expr with
-    | Unit -> Some (Forall ([], TUnit))
-    | True | False -> Some (Forall ([], TBool))
-    | Int _ -> Some (Forall ([], TInt))
-    | Float _ -> Some (Forall ([], TFloat))
-    | Nil -> Some (Forall ([], TList (TVar (gensym ()))))
-    | Var x -> Env.find_opt x env
-    | Bop (Add, e1, e2)
-    | Bop (Sub, e1, e2)
-    | Bop (Mul, e1, e2)
-    | Bop (Div, e1, e2)
-    | Bop (Mod, e1, e2) ->
-        (match type_of env e1, type_of env e2 with
-         | Some (Forall (_, TInt)), Some (Forall (_, TInt)) -> Some (Forall ([], TInt))
-         | _ -> None)
-    | Bop (AddF, e1, e2)
-    | Bop (SubF, e1, e2)
-    | Bop (MulF, e1, e2)
-    | Bop (DivF, e1, e2)
-    | Bop (PowF, e1, e2) ->
-        (match type_of env e1, type_of env e2 with
-         | Some (Forall (_, TFloat)), Some (Forall (_, TFloat)) -> Some (Forall ([], TFloat))
-         | _ -> None)
-    | Bop (Eq, e1, e2)
-    | Bop (Neq, e1, e2)
-    | Bop (Lt, e1, e2)
-    | Bop (Lte, e1, e2)
-    | Bop (Gt, e1, e2)
-    | Bop (Gte, e1, e2) ->
-        (match type_of env e1, type_of env e2 with
-         | Some (Forall (_, t1)), Some (Forall (_, t2)) when t1 = t2 -> Some (Forall ([], TBool))
-         | _ -> None)
-    | Bop (And, e1, e2)
-    | Bop (Or, e1, e2) ->
-        (match type_of env e1, type_of env e2 with
-         | Some (Forall (_, TBool)), Some (Forall (_, TBool)) -> Some (Forall ([], TBool))
-         | _ -> None)
-    | If (cond, then_branch, else_branch) ->
-        (match type_of env cond, type_of env then_branch, type_of env else_branch with
-         | Some (Forall (_, TBool)), Some (Forall (_, t1)), Some (Forall (_, t2)) when t1 = t2 ->
-             Some (Forall ([], t1))
-         | _ -> None)
-    | Fun (arg, annot, body) ->
-        let arg_ty = match annot with Some ty -> ty | None -> TVar (gensym ()) in
-        let new_env = Env.add arg (Forall ([], arg_ty)) env in
-        (match type_of new_env body with
-         | Some (Forall (qs, body_ty)) -> Some (Forall (qs, TFun (arg_ty, body_ty)))
-         | None -> None)
-    | App (f, arg) ->
-        (match type_of env f, type_of env arg with
-         | Some (Forall (_, TFun (param_ty, ret_ty))), Some (Forall (_, arg_ty))
-           when param_ty = arg_ty -> Some (Forall ([], ret_ty))
-         | _ -> None)
-    | Let { is_rec = false; name; value; body } ->
-        (match type_of env value with
-         | Some scheme ->
-             let new_env = Env.add name scheme env in
-             type_of new_env body
-         | None -> None)
-    | Let { is_rec = true; name; value; body } ->
-      (match value with
-        | Fun (arg, annot, body_fun) ->
-            let arg_ty = match annot with Some ty -> ty | None -> TVar (gensym ()) in
-            let body_ty = TVar (gensym ()) in
-            let fun_ty = TFun (arg_ty, body_ty) in
-            let new_env = Env.add name (Forall ([], fun_ty)) env in
-            (match type_of (Env.add arg (Forall ([], arg_ty)) new_env) body_fun with
-            | Some (Forall (_, inferred_body_ty)) ->
-                (match unify fun_ty [(TFun (arg_ty, inferred_body_ty), fun_ty)] with
-                  | Some (Forall (_, unified_ty)) -> type_of (Env.add name (Forall ([], unified_ty)) env) body
-                  | None -> None)
-            | None -> None)
-        | _ -> None)
-      
-    | Assert e ->
-        (match type_of env e with
-         | Some (Forall (_, TBool)) -> Some (Forall ([], TUnit))
-         | _ -> None)
-    | _ -> None
-  
-  
-  
-  
+(* Type Inference Function *)
+let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
+  match expr with
+  | Unit -> Some (Forall ([], TUnit))
+  | True | False -> Some (Forall ([], TBool))
+  | Int _ -> Some (Forall ([], TInt))
+  | Float _ -> Some (Forall ([], TFloat))
+  | Nil -> Some (Forall ([], TList (TVar (gensym ()))))
+  | Var x -> Env.find_opt x env
+  | Bop (Add, e1, e2)
+  | Bop (Sub, e1, e2)
+  | Bop (Mul, e1, e2)
+  | Bop (Div, e1, e2)
+  | Bop (Mod, e1, e2) ->
+      (match type_of env e1, type_of env e2 with
+       | Some (Forall (_, TInt)), Some (Forall (_, TInt)) -> Some (Forall ([], TInt))
+       | _ -> None)
+  | Bop (Eq, e1, e2)
+  | Bop (Neq, e1, e2)
+  | Bop (Lt, e1, e2)
+  | Bop (Lte, e1, e2)
+  | Bop (Gt, e1, e2)
+  | Bop (Gte, e1, e2) ->
+      (match type_of env e1, type_of env e2 with
+       | Some (Forall (_, t1)), Some (Forall (_, t2)) when t1 = t2 -> Some (Forall ([], TBool))
+       | _ -> None)
+  | If (cond, then_branch, else_branch) ->
+      (match type_of env cond, type_of env then_branch, type_of env else_branch with
+       | Some (Forall (_, TBool)), Some (Forall (_, t1)), Some (Forall (_, t2)) when t1 = t2 ->
+           Some (Forall ([], t1))
+       | _ -> None)
+  | Fun (arg, annot, body) ->
+      let arg_ty = match annot with Some ty -> ty | None -> TVar (gensym ()) in
+      let new_env = Env.add arg (Forall ([], arg_ty)) env in
+      (match type_of new_env body with
+       | Some (Forall (qs, body_ty)) -> Some (Forall (qs, TFun (arg_ty, body_ty)))
+       | None -> None)
+  | Let { is_rec = false; name; value; body } ->
+      (match type_of env value with
+       | Some scheme ->
+           let new_env = Env.add name scheme env in
+           type_of new_env body
+       | None -> None)
+  | Assert e ->
+      (match type_of env e with
+       | Some (Forall (_, TBool)) -> Some (Forall ([], TUnit))
+       | _ -> None)
+  | _ -> None
 
 exception AssertFail
 exception DivByZero
@@ -163,31 +125,33 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
   | False -> VBool false
   | Int n -> VInt n
   | Float f -> VFloat f
-  | Var x -> (try Env.find x env with Not_found -> assert false)
+  | Var x ->
+      (try Env.find x env
+       with Not_found -> assert false )
   | Assert e ->
       (match eval_expr env e with
        | VBool true -> VUnit
        | VBool false -> raise AssertFail
-       | _ -> assert false)
+       | _ -> assert false )
   | ENone -> VNone
   | ESome e -> VSome (eval_expr env e)
   | OptMatch { matched; some_name; some_case; none_case } ->
       (match eval_expr env matched with
        | VSome v -> eval_expr (Env.add some_name v env) some_case
        | VNone -> eval_expr env none_case
-       | _ -> assert false)
+       | _ -> assert false )
   | Nil -> VList []
   | Bop (Cons, hd, tl) ->
       (match eval_expr env tl with
        | VList lst -> VList (eval_expr env hd :: lst)
-       | _ -> assert false)
+       | _ -> assert false )
   | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
       (match eval_expr env matched with
        | VList (hd :: tl) ->
            let env' = Env.add hd_name hd (Env.add tl_name (VList tl) env) in
            eval_expr env' cons_case
        | VList [] -> eval_expr env nil_case
-       | _ -> assert false)
+       | _ -> assert false )
   | Bop (Comma, e1, e2) ->
       let v1 = eval_expr env e1 in
       let v2 = eval_expr env e2 in
@@ -197,7 +161,7 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | VPair (v1, v2) ->
            let env' = Env.add fst_name v1 (Env.add snd_name v2 env) in
            eval_expr env' case
-       | _ -> assert false)
+       | _ -> assert false )
   | Bop (op, e1, e2) ->
       let v1 = eval_expr env e1 in
       let v2 = eval_expr env e2 in
@@ -226,19 +190,19 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Gte, v1, v2) -> VBool (v1 >= v2)
        | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
        | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
-       | _ -> assert false)
+       | _ -> assert false )
   | If (cond, then_branch, else_branch) ->
       (match eval_expr env cond with
        | VBool true -> eval_expr env then_branch
        | VBool false -> eval_expr env else_branch
-       | _ -> assert false)
+       | _ -> assert false )
   | Fun (arg, _, body) -> VClos { name = None; arg; body; env }
   | App (f, arg) ->
       (match eval_expr env f with
        | VClos { name = _; arg = param; body; env = closure_env } ->
            let arg_val = eval_expr env arg in
            eval_expr (Env.add param arg_val closure_env) body
-       | _ -> assert false)
+       | _ -> assert false )
   | Let { is_rec = false; name; value; body } ->
       let value_val = eval_expr env value in
       eval_expr (Env.add name value_val env) body
@@ -247,8 +211,9 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | Fun (arg, _, body_fun) ->
            let rec_env = Env.add name (VClos { name = Some name; arg; body = body_fun; env }) env in
            eval_expr rec_env body
-       | _ -> raise RecWithoutArg)
-  | _ -> assert false
+       | _ -> raise RecWithoutArg )
+  | _ -> assert false 
+
 
 
 
