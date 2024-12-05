@@ -55,30 +55,101 @@ let unify (ty : ty) (constrs : constr list) : ty_scheme option =
       Some (Forall ([], generalized_ty))
   | None -> None
 
-let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
-  match expr with
-  | Int _ -> Some (Forall ([], TInt))
-  | Float _ -> Some (Forall ([], TFloat))
-  | True | False -> Some (Forall ([], TBool))
-  | Var x -> Env.find_opt x env
-  | Fun (arg, _, body) ->
-      let arg_ty = TVar (gensym ()) in
-      let new_env = Env.add arg (Forall ([], arg_ty)) env in
-      (match type_of new_env body with
-       | Some (Forall (qs, body_ty)) -> Some (Forall (qs, TFun (arg_ty, body_ty)))
-       | None -> None)
-  | App (f, arg) ->
-      (match type_of env f, type_of env arg with
-       | Some (Forall (_, TFun (param_ty, ret_ty))), Some (Forall (_, arg_ty))
-         when param_ty = arg_ty -> Some (Forall ([], ret_ty))
-       | _ -> None)
-  | Let { is_rec = _is_rec; name; value; body } ->
-      (match type_of env value with
-       | Some scheme ->
-           let new_env = Env.add name scheme env in
-           type_of new_env body
-       | None -> None)
-  | _ -> None
+  let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
+    match expr with
+    | Unit -> Some (Forall ([], TUnit))
+    | True | False -> Some (Forall ([], TBool))
+    | Int _ -> Some (Forall ([], TInt))
+    | Float _ -> Some (Forall ([], TFloat))
+    | Var x ->
+        (match Env.find_opt x env with
+         | Some ty_scheme -> Some ty_scheme
+         | None -> None) 
+  
+    | Fun (arg, annot, body) ->
+        let arg_ty = match annot with
+          | Some ty -> ty
+          | None -> TVar (gensym ())
+        in
+        let new_env = Env.add arg (Forall ([], arg_ty)) env in
+        (match type_of new_env body with
+         | Some (Forall (qs, body_ty)) -> Some (Forall (qs, TFun (arg_ty, body_ty)))
+         | None -> None)
+  
+    | App (f, arg) ->
+        (match type_of env f, type_of env arg with
+         | Some (Forall (_, TFun (param_ty, ret_ty))), Some (Forall (_, arg_ty)) ->
+             if param_ty = arg_ty then Some (Forall ([], ret_ty))
+             else None 
+         | _ -> None)
+  
+    | Annot (expr, annot_ty) ->
+        (match type_of env expr with
+         | Some (Forall (_, expr_ty)) when expr_ty = annot_ty -> Some (Forall ([], annot_ty))
+         | _ -> None)
+  
+    | If (cond, then_branch, else_branch) ->
+        (match type_of env cond, type_of env then_branch, type_of env else_branch with
+         | Some (Forall (_, TBool)), Some (Forall (_, then_ty)), Some (Forall (_, else_ty)) ->
+             if then_ty = else_ty then Some (Forall ([], then_ty))
+             else None
+         | _ -> None)
+  
+    | Let { is_rec; name; value; body } ->
+        (match is_rec, value with
+         | false, _ ->
+             (match type_of env value with
+              | Some scheme ->
+                  let new_env = Env.add name scheme env in
+                  type_of new_env body
+              | None -> None)
+         | true, Fun (arg, _, body_fun) ->
+             let arg_ty = TVar (gensym ()) in
+             let ret_ty = TVar (gensym ()) in
+             let func_ty = TFun (arg_ty, ret_ty) in
+             let new_env = Env.add name (Forall ([], func_ty)) env in
+             (match type_of (Env.add arg (Forall ([], arg_ty)) new_env) body_fun with
+              | Some (Forall (_, ret_ty')) ->
+                  if ret_ty = ret_ty' then type_of new_env body else None
+              | None -> None)
+         | true, _ -> None )
+  
+    | OptMatch { matched; some_name; some_case; none_case } ->
+        (match type_of env matched with
+         | Some (Forall (_, TOption opt_ty)) ->
+             let new_env = Env.add some_name (Forall ([], opt_ty)) env in
+             (match type_of new_env some_case, type_of env none_case with
+              | Some (Forall (_, some_ty)), Some (Forall (_, none_ty)) when some_ty = none_ty ->
+                  Some (Forall ([], some_ty))
+              | _ -> None)
+         | _ -> None)
+  
+    | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
+        (match type_of env matched with
+         | Some (Forall (_, TList elem_ty)) ->
+             let new_env = Env.add hd_name (Forall ([], elem_ty)) (Env.add tl_name (Forall ([], TList elem_ty)) env) in
+             (match type_of new_env cons_case, type_of env nil_case with
+              | Some (Forall (_, cons_ty)), Some (Forall (_, nil_ty)) when cons_ty = nil_ty ->
+                  Some (Forall ([], cons_ty))
+              | _ -> None)
+         | _ -> None)
+  
+    | PairMatch { matched; fst_name; snd_name; case } ->
+        (match type_of env matched with
+         | Some (Forall (_, TPair (fst_ty, snd_ty))) ->
+             let new_env = Env.add fst_name (Forall ([], fst_ty)) (Env.add snd_name (Forall ([], snd_ty)) env) in
+             type_of new_env case
+         | _ -> None)
+  
+    | Nil -> Some (Forall ([], TList (TVar (gensym ()))))
+    | ENone -> Some (Forall ([], TOption (TVar (gensym ())))) 
+    | ESome e ->
+        (match type_of env e with
+         | Some (Forall (_, elem_ty)) -> Some (Forall ([], TOption elem_ty))
+         | _ -> None)
+  
+    | _ -> None
+  
 
 exception AssertFail
 exception DivByZero
