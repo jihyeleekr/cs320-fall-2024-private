@@ -25,13 +25,15 @@ let apply_subst_to_constraints subst constraints =
 let rec unify ty constraints =
   match constraints with
   | [] -> Some (Forall ([], ty)) 
-  | (t1, t2) :: rest when t1 = t2 -> unify ty rest
+  | (t1, t2) :: rest when t1 = t2 -> unify ty rest 
   | (TVar x, t) :: rest | (t, TVar x) :: rest ->
     if occurs x t then None 
     else
       let subst = [(x, t)] in
       (match unify (apply_subst subst ty) (apply_subst_to_constraints subst rest) with
-       | Some (Forall (vars, ty')) -> Some (Forall (vars, ty'))
+       | Some (Forall (vars, unified_ty)) ->
+         let subst_ty = apply_subst subst unified_ty in
+         Some (Forall (vars, subst_ty))
        | None -> None)
   | (TFun (t1a, t1b), TFun (t2a, t2b)) :: rest ->
     unify ty ((t1a, t2a) :: (t1b, t2b) :: rest)
@@ -39,7 +41,10 @@ let rec unify ty constraints =
     unify ty ((t1a, t2a) :: (t1b, t2b) :: rest)
   | (TList t1, TList t2) :: rest | (TOption t1, TOption t2) :: rest ->
     unify ty ((t1, t2) :: rest)
+  | (TInt, TFloat) :: _ | (TFloat, TInt) :: _ -> None 
+  | (TBool, TInt) :: _ | (TBool, TFloat) :: _ -> None 
   | _ -> None 
+
 
 
 (* type_of Function *)
