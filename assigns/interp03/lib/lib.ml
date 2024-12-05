@@ -134,15 +134,21 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Add, VInt n1, VInt n2) -> VInt (n1 + n2)
        | (Sub, VInt n1, VInt n2) -> VInt (n1 - n2)
        | (Mul, VInt n1, VInt n2) -> VInt (n1 * n2)
-       | (Div, VInt n1, VInt n2) ->
-           if n2 = 0 then raise DivByZero else VInt (n1 / n2)
-       | (Mod, VInt n1, VInt n2) ->
-           if n2 = 0 then raise DivByZero else VInt (n1 mod n2)
+       | (Div, VInt _, VInt 0) -> raise DivByZero
+       | (Div, VInt n1, VInt n2) -> VInt (n1 / n2)
+       | (Mod, VInt _, VInt 0) -> raise DivByZero
+       | (Mod, VInt n1, VInt n2) -> VInt (n1 mod n2)
        | (AddF, VFloat f1, VFloat f2) -> VFloat (f1 +. f2)
        | (SubF, VFloat f1, VFloat f2) -> VFloat (f1 -. f2)
        | (MulF, VFloat f1, VFloat f2) -> VFloat (f1 *. f2)
        | (DivF, VFloat f1, VFloat f2) -> VFloat (f1 /. f2)
        | (PowF, VFloat f1, VFloat f2) -> VFloat (f1 ** f2)
+       | (Eq, VClos _, _) | (Eq, _, VClos _) -> raise CompareFunVals
+       | (Eq, v1, v2) -> VBool (v1 = v2)
+       | (Neq, VClos _, _) | (Neq, _, VClos _) -> raise CompareFunVals
+       | (Neq, v1, v2) -> VBool (v1 <> v2)
+       | (Lt, VClos _, _) | (Lt, _, VClos _) -> raise CompareFunVals
+       | (Lt, v1, v2) -> VBool (v1 < v2)
        | _ -> assert false)
   | If (cond, then_branch, else_branch) ->
       (match eval_expr env cond with
@@ -165,8 +171,8 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
            let rec_env = Env.add name (VClos { name = Some name; arg; body = body_fun; env }) env in
            eval_expr rec_env body
        | _ -> raise RecWithoutArg)
-
   | _ -> assert false
+
 
 
 
