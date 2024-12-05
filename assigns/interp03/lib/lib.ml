@@ -9,6 +9,13 @@ let rec occurs x ty =
   | TList t | TOption t -> occurs x t
   | _ -> false
 
+let rec free_vars ty =
+  match ty with
+  | TVar x -> [x]
+  | TFun (t1, t2) | TPair (t1, t2) -> free_vars t1 @ free_vars t2
+  | TList t | TOption t -> free_vars t
+  | _ -> []
+
 let rec apply_subst subst ty =
   match ty with
   | TVar x -> (try List.assoc x subst with Not_found -> ty)
@@ -21,19 +28,33 @@ let rec apply_subst subst ty =
 let apply_subst_to_constraints subst constraints =
   List.map (fun (t1, t2) -> (apply_subst subst t1, apply_subst subst t2)) constraints
 
-(* unify Function *)
+(* Custom sort_uniq function *)
+let sort_uniq cmp lst =
+  let sorted = List.sort cmp lst in
+  let rec uniq acc = function
+    | [] -> List.rev acc
+    | [x] -> List.rev (x :: acc)
+    | x :: (y :: _ as rest) -> if cmp x y = 0 then uniq acc rest else uniq (x :: acc) rest
+  in
+  uniq [] sorted
+
+(* Unify Function *)
 let rec unify ty constraints =
   match constraints with
-  | [] -> Some (Forall ([], ty)) 
+  | [] -> 
+    let free = sort_uniq compare (free_vars ty) in
+    Some (Forall (free, ty)) 
   | (t1, t2) :: rest when t1 = t2 -> unify ty rest 
   | (TVar x, t) :: rest | (t, TVar x) :: rest ->
     if occurs x t then None 
     else
       let subst = [(x, t)] in
-      (match unify (apply_subst subst ty) (apply_subst_to_constraints subst rest) with
-       | Some (Forall (vars, unified_ty)) ->
-         let subst_ty = apply_subst subst unified_ty in
-         Some (Forall (vars, subst_ty))
+      let unified_ty = apply_subst subst ty in
+      let unified_constraints = apply_subst_to_constraints subst rest in
+      (match unify unified_ty unified_constraints with
+       | Some (Forall (vars, final_ty)) ->
+         let new_vars = List.filter (fun v -> v <> x) vars in
+         Some (Forall (new_vars, final_ty))
        | None -> None)
   | (TFun (t1a, t1b), TFun (t2a, t2b)) :: rest ->
     unify ty ((t1a, t2a) :: (t1b, t2b) :: rest)
@@ -44,7 +65,6 @@ let rec unify ty constraints =
   | (TInt, TFloat) :: _ | (TFloat, TInt) :: _ -> None 
   | (TBool, TInt) :: _ | (TBool, TFloat) :: _ -> None 
   | _ -> None 
-
 
 
 (* type_of Function *)
