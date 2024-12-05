@@ -73,31 +73,24 @@ let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
   | Float _ -> Some (Forall ([], TFloat))
   | Nil -> Some (Forall ([], TList (TVar (gensym ()))))
   | Var x -> Env.find_opt x env
-  | Bop (Add, e1, e2)
-  | Bop (Sub, e1, e2)
-  | Bop (Mul, e1, e2)
-  | Bop (Div, e1, e2)
-  | Bop (Mod, e1, e2) ->
-      (match type_of env e1, type_of env e2 with
-       | Some (Forall (_, TInt)), Some (Forall (_, TInt)) -> Some (Forall ([], TInt))
-       | _ -> None)
-  | Bop (AddF, e1, e2)
-  | Bop (SubF, e1, e2)
-  | Bop (MulF, e1, e2)
-  | Bop (DivF, e1, e2)
-  | Bop (PowF, e1, e2) ->
-      (match type_of env e1, type_of env e2 with
-       | Some (Forall (_, TFloat)), Some (Forall (_, TFloat)) -> Some (Forall ([], TFloat))
-       | _ -> None)
-  | Bop (Eq, e1, e2)
-  | Bop (Neq, e1, e2)
-  | Bop (Lt, e1, e2)
-  | Bop (Lte, e1, e2)
-  | Bop (Gt, e1, e2)
-  | Bop (Gte, e1, e2) ->
-      (match type_of env e1, type_of env e2 with
-       | Some (Forall (_, t1)), Some (Forall (_, t2)) when t1 = t2 -> Some (Forall ([], TBool))
-       | _ -> None)
+  | Bop (op, e1, e2) ->
+      let (expected_ty1, expected_ty2, result_ty) = 
+        match op with
+        | Add | Sub | Mul | Div | Mod -> (TInt, TInt, TInt)
+        | AddF | SubF | MulF | DivF | PowF -> (TFloat, TFloat, TFloat)
+        | Lt | Lte | Gt | Gte | Eq | Neq -> (TInt, TInt, TBool)
+        | And | Or -> (TBool, TBool, TBool)
+        | _ -> failwith "Unsupported binary operator"
+      in
+      (match type_of env e1 with
+       | Some (Forall (_, ty1)) when ty1 <> expected_ty1 -> None
+       | Some (Forall (_, _)) -> (
+           match type_of env e2 with
+           | Some (Forall (_, ty2)) when ty2 <> expected_ty2 -> None
+           | Some (Forall (_, _)) -> Some (Forall ([], result_ty))
+           | None -> None
+         )
+       | None -> None)
   | If (cond, then_branch, else_branch) ->
       (match type_of env cond, type_of env then_branch, type_of env else_branch with
        | Some (Forall (_, TBool)), Some (Forall (_, t1)), Some (Forall (_, t2)) when t1 = t2 ->
@@ -139,6 +132,7 @@ let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
        | Some (Forall (_, TBool)) -> Some (Forall ([], TUnit))
        | _ -> None)
   | _ -> None
+
 
 
 exception AssertFail
