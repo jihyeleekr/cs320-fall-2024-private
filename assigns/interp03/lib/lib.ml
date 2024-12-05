@@ -92,7 +92,7 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
   | False -> VBool false
   | Int n -> VInt n
   | Float f -> VFloat f
-  | Var x -> (try Env.find x env with Not_found -> raise (Failure ("Unbound variable: " ^ x)))
+  | Var x -> (try Env.find x env with Not_found -> assert false)
   | Assert e ->
       (match eval_expr env e with
        | VBool true -> VUnit
@@ -117,6 +117,16 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
            eval_expr env' cons_case
        | VList [] -> eval_expr env nil_case
        | _ -> assert false)
+  | Bop (Comma, e1, e2) ->
+      let v1 = eval_expr env e1 in
+      let v2 = eval_expr env e2 in
+      VPair (v1, v2)
+  | PairMatch { matched; fst_name; snd_name; case } ->
+      (match eval_expr env matched with
+       | VPair (v1, v2) ->
+           let env' = Env.add fst_name v1 (Env.add snd_name v2 env) in
+           eval_expr env' case
+       | _ -> assert false)
   | Bop (op, e1, e2) ->
       let v1 = eval_expr env e1 in
       let v2 = eval_expr env e2 in
@@ -124,15 +134,12 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Add, VInt n1, VInt n2) -> VInt (n1 + n2)
        | (Sub, VInt n1, VInt n2) -> VInt (n1 - n2)
        | (Mul, VInt n1, VInt n2) -> VInt (n1 * n2)
-       | (Div, VInt _, VInt 0) -> raise DivByZero
-       | (Div, VInt n1, VInt n2) -> VInt (n1 / n2)
-       | (Mod, VInt _, VInt 0) -> raise DivByZero
-       | (Mod, VInt n1, VInt n2) -> VInt (n1 mod n2)
+       | (Div, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt(n1 / n2)
+       | (Mod, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt(n1 mod n2)
        | (AddF, VFloat f1, VFloat f2) -> VFloat (f1 +. f2)
        | (SubF, VFloat f1, VFloat f2) -> VFloat (f1 -. f2)
        | (MulF, VFloat f1, VFloat f2) -> VFloat (f1 *. f2)
-       | (DivF, VFloat _, VFloat 0.) -> raise DivByZero
-       | (DivF, VFloat f1, VFloat f2) -> VFloat (f1 /. f2)
+       | (DivF, VFloat f1, VFloat f2) -> if f2 = 0. then raise DivByZero else VFloat (f1 /. f2)
        | (PowF, VFloat f1, VFloat f2) -> VFloat (f1 ** f2)
        | (Eq, VClos _, _) | (Eq, _, VClos _) -> raise CompareFunVals
        | (Eq, v1, v2) -> VBool (v1 = v2)
@@ -146,8 +153,6 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Gt, v1, v2) -> VBool (v1 > v2)
        | (Gte, VClos _, _) | (Gte, _, VClos _) -> raise CompareFunVals
        | (Gte, v1, v2) -> VBool (v1 >= v2)
-       | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
-       | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
        | _ -> assert false)
   | If (cond, then_branch, else_branch) ->
       (match eval_expr env cond with
@@ -171,7 +176,6 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
            eval_expr rec_env body
        | _ -> raise RecWithoutArg)
   | _ -> assert false
-
 
 let type_check =
   let rec go ctxt = function
