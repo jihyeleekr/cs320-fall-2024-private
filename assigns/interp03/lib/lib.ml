@@ -81,6 +81,14 @@ let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
       (match type_of env e1, type_of env e2 with
        | Some (Forall (_, TInt)), Some (Forall (_, TInt)) -> Some (Forall ([], TInt))
        | _ -> None)
+  | Bop (AddF, e1, e2)
+  | Bop (SubF, e1, e2)
+  | Bop (MulF, e1, e2)
+  | Bop (DivF, e1, e2)
+  | Bop (PowF, e1, e2) ->
+      (match type_of env e1, type_of env e2 with
+       | Some (Forall (_, TFloat)), Some (Forall (_, TFloat)) -> Some (Forall ([], TFloat))
+       | _ -> None)
   | Bop (Eq, e1, e2)
   | Bop (Neq, e1, e2)
   | Bop (Lt, e1, e2)
@@ -101,17 +109,37 @@ let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
       (match type_of new_env body with
        | Some (Forall (qs, body_ty)) -> Some (Forall (qs, TFun (arg_ty, body_ty)))
        | None -> None)
+  | App (f, arg) ->
+      (match type_of env f, type_of env arg with
+       | Some (Forall (_, TFun (param_ty, ret_ty))), Some (Forall (_, arg_ty))
+         when param_ty = arg_ty -> Some (Forall ([], ret_ty))
+       | _ -> None)
   | Let { is_rec = false; name; value; body } ->
       (match type_of env value with
        | Some scheme ->
            let new_env = Env.add name scheme env in
            type_of new_env body
        | None -> None)
+  | Let { is_rec = true; name; value; body } ->
+      (match value with
+       | Fun (arg, annot, body_fun) ->
+           let arg_ty = match annot with Some ty -> ty | None -> TVar (gensym ()) in
+           let body_ty = TVar (gensym ()) in
+           let fun_ty = TFun (arg_ty, body_ty) in
+           let new_env = Env.add name (Forall ([], fun_ty)) env in
+           (match type_of (Env.add arg (Forall ([], arg_ty)) new_env) body_fun with
+            | Some (Forall (_, inferred_body_ty)) ->
+                (match unify fun_ty [(TFun (arg_ty, inferred_body_ty), fun_ty)] with
+                 | Some (Forall (_, unified_ty)) -> type_of (Env.add name (Forall ([], unified_ty)) env) body
+                 | None -> None)
+            | None -> None)
+       | _ -> None)
   | Assert e ->
       (match type_of env e with
        | Some (Forall (_, TBool)) -> Some (Forall ([], TUnit))
        | _ -> None)
   | _ -> None
+
 
 exception AssertFail
 exception DivByZero
