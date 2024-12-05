@@ -84,10 +84,10 @@ let rec type_of env expr =
     let arg_ty = TVar (gensym ()) in
     let res_ty = TVar (gensym ()) in
     (match type_of env f, type_of env arg with
-     | Some (Forall (_, f_ty)), Some (Forall (_, actual_arg_ty)) ->
-         let constraints = [(f_ty, TFun (arg_ty, res_ty)); (arg_ty, actual_arg_ty)] in
+     | Some (Forall (_, f_ty)), Some (Forall (_, arg_ty_actual)) ->
+         let constraints = [(f_ty, TFun (arg_ty, res_ty)); (arg_ty, arg_ty_actual)] in
          (match unify res_ty constraints with
-          | Some (Forall (_, unified_ty)) -> Some (Forall ([], apply_subst [] unified_ty))
+          | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
           | None -> None)
      | _ -> None)
   | Let { is_rec; name; value; body } ->
@@ -115,11 +115,11 @@ let rec type_of env expr =
           | None -> None)
      | _ -> None)
   | Bop (op, e1, e2) ->
-    let result_ty, operand_ty =
+    let operand_ty, result_ty =
       match op with
       | Add | Sub | Mul | Div | Mod -> (TInt, TInt)
       | AddF | SubF | MulF | DivF | PowF -> (TFloat, TFloat)
-      | _ -> (TBool, TVar (gensym ()))
+      | _ -> (TBool, TBool)
     in
     (match type_of env e1, type_of env e2 with
      | Some (Forall (_, t1)), Some (Forall (_, t2)) ->
@@ -167,9 +167,6 @@ let rec type_of env expr =
           | None -> None)
      | _ -> None)
   | _ -> None
-
-
-
 
 
 exception AssertFail
