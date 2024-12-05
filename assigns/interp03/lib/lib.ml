@@ -2,31 +2,35 @@ open Utils
 include My_parser
 
 let unify (ty : ty) (constrs : constr list) : ty_scheme option =
+  let rec occurs_check x ty subst =
+    let rec exists p = function
+      | [] -> false
+      | y :: ys -> p y || exists p ys
+    in
+    match ty with
+    | TVar y -> y = x || exists (fun (_, t) -> occurs_check x t subst) subst
+    | TFun (t1, t2) -> occurs_check x t1 subst || occurs_check x t2 subst
+    | TList t | TOption t -> occurs_check x t subst
+    | TPair (t1, t2) -> occurs_check x t1 subst || occurs_check x t2 subst
+    | _ -> false
+  in
+
   let rec unify_types ty1 ty2 subst =
     match (ty1, ty2) with
     | TVar x, TVar y when x = y -> Some subst
-    | TVar x, _ ->
-        (match List.assoc_opt x subst with
-         | None -> Some ((x, ty2) :: subst)
-         | Some bound_ty -> unify_types bound_ty ty2 subst)
-    | _, TVar y ->
-        (match List.assoc_opt y subst with
-         | None -> Some ((y, ty1) :: subst)
-         | Some bound_ty -> unify_types ty1 bound_ty subst)
+    | TVar x, t | t, TVar x ->
+        if occurs_check x t subst then None
+        else Some ((x, t) :: subst)
     | TFun (t1, t2), TFun (t1', t2') ->
         (match unify_types t1 t1' subst with
          | Some subst' -> unify_types t2 t2' subst'
          | None -> None)
-    | TList t1, TList t2 -> unify_types t1 t2 subst
-    | TOption t1, TOption t2 -> unify_types t1 t2 subst
+    | TList t1, TList t2 | TOption t1, TOption t2 -> unify_types t1 t2 subst
     | TPair (t1, t2), TPair (t1', t2') ->
         (match unify_types t1 t1' subst with
          | Some subst' -> unify_types t2 t2' subst'
          | None -> None)
-    | TUnit, TUnit
-    | TInt, TInt
-    | TFloat, TFloat
-    | TBool, TBool -> Some subst
+    | TUnit, TUnit | TInt, TInt | TFloat, TFloat | TBool, TBool -> Some subst
     | _, _ -> None
   in
 
@@ -55,30 +59,135 @@ let unify (ty : ty) (constrs : constr list) : ty_scheme option =
       Some (Forall ([], generalized_ty))
   | None -> None
 
-let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
-  match expr with
-  | Int _ -> Some (Forall ([], TInt))
-  | Float _ -> Some (Forall ([], TFloat))
-  | True | False -> Some (Forall ([], TBool))
-  | Var x -> Env.find_opt x env
-  | Fun (arg, _, body) ->
-      let arg_ty = TVar (gensym ()) in
-      let new_env = Env.add arg (Forall ([], arg_ty)) env in
-      (match type_of new_env body with
-       | Some (Forall (qs, body_ty)) -> Some (Forall (qs, TFun (arg_ty, body_ty)))
-       | None -> None)
-  | App (f, arg) ->
-      (match type_of env f, type_of env arg with
-       | Some (Forall (_, TFun (param_ty, ret_ty))), Some (Forall (_, arg_ty))
-         when param_ty = arg_ty -> Some (Forall ([], ret_ty))
-       | _ -> None)
-  | Let { is_rec = _is_rec; name; value; body } ->
-      (match type_of env value with
-       | Some scheme ->
-           let new_env = Env.add name scheme env in
-           type_of new_env body
-       | None -> None)
-  | _ -> None
+
+  let rec type_of (env : stc_env) (expr : expr) : ty_scheme option =
+    match expr with
+    (* Literals *)
+    | Int _ -> Some (Forall ([], TInt))
+    | Float _ -> Some (Forall ([], TFloat))
+    | True | False -> Some (Forall ([], TBool))
+    | Unit -> Some (Forall ([], TUnit))
+    | Var x -> Env.find_opt x env
+  
+    (* Functions *)
+    | Fun (arg, _, body) ->
+        let arg_ty = TVar (gensym ()) in
+        let new_env = Env.add arg (Forall ([], arg_ty)) env in
+        (match type_of new_env body with
+         | Some (Forall (qs, body_ty)) -> Some (Forall (qs, TFun (arg_ty, body_ty)))
+         | None -> None)
+  
+    (* Function Applications *)
+    | App (f, arg) ->
+        (match type_of env f, type_of env arg with
+         | Some (Forall (_, TFun (param_ty, ret_ty))), Some (Forall (_, arg_ty))
+           when param_ty = arg_ty ->
+             Some (Forall ([], ret_ty))
+         | _ -> None)
+  
+    (* Let Bindings *)
+    | Let { is_rec = false; name; value; body } ->
+        (match type_of env value with
+         | Some scheme ->
+             let new_env = Env.add name scheme env in
+             type_of new_env body
+         | None -> None)
+    | Let { is_rec = true; name; value; body } ->
+        (match value with
+         | Fun (arg, _, body_fun) ->
+             let arg_ty = TVar (gensym ()) in
+             let ret_ty = TVar (gensym ()) in
+             let fun_ty = TFun (arg_ty, ret_ty) in
+             let new_env = Env.add name (Forall ([], fun_ty)) env in
+             let body_env = Env.add arg (Forall ([], arg_ty)) new_env in
+             (match type_of body_env body_fun with
+              | Some (Forall (_, inferred_ret_ty)) when inferred_ret_ty = ret_ty ->
+                  type_of new_env body
+              | _ -> None)
+         | _ -> None)
+  
+    (* If Expressions *)
+    | If (cond, then_branch, else_branch) ->
+        (match type_of env cond, type_of env then_branch, type_of env else_branch with
+         | Some (Forall (_, TBool)), Some (Forall (_, tau1)), Some (Forall (_, tau2))
+           when tau1 = tau2 ->
+             Some (Forall ([], tau1))
+         | _ -> None)
+  
+    (* Option Match *)
+    | OptMatch { matched; some_name; some_case; none_case } ->
+        (match type_of env matched with
+         | Some (Forall (_, TOption tau)) ->
+             let env_some = Env.add some_name (Forall ([], tau)) env in
+             (match type_of env_some some_case, type_of env none_case with
+              | Some (Forall (_, tau1)), Some (Forall (_, tau2)) when tau1 = tau2 ->
+                  Some (Forall ([], tau1))
+              | _ -> None)
+         | _ -> None)
+  
+    (* List Match *)
+    | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
+        (match type_of env matched with
+         | Some (Forall (_, TList tau)) ->
+             let env_cons = Env.add hd_name (Forall ([], tau)) (Env.add tl_name (Forall ([], TList tau)) env) in
+             (match type_of env_cons cons_case, type_of env nil_case with
+              | Some (Forall (_, tau1)), Some (Forall (_, tau2)) when tau1 = tau2 ->
+                  Some (Forall ([], tau1))
+              | _ -> None)
+         | _ -> None)
+  
+    (* Pair Match *)
+    | PairMatch { matched; fst_name; snd_name; case } ->
+        (match type_of env matched with
+         | Some (Forall (_, TPair (tau1, tau2))) ->
+             let env_pair = Env.add fst_name (Forall ([], tau1)) (Env.add snd_name (Forall ([], tau2)) env) in
+             type_of env_pair case
+         | _ -> None)
+  
+    (* Type Annotations *)
+    | Annot (e, ty) ->
+        (match type_of env e with
+         | Some (Forall (_, tau)) when tau = ty -> Some (Forall ([], ty))
+         | _ -> None)
+  
+    (* Operators *)
+    | Bop (op, e1, e2) ->
+        (match op with
+         | Add | Sub | Mul | Div | Mod ->
+             (match type_of env e1, type_of env e2 with
+              | Some (Forall (_, TInt)), Some (Forall (_, TInt)) ->
+                  Some (Forall ([], TInt))
+              | _ -> None)
+         | AddF | SubF | MulF | DivF | PowF ->
+             (match type_of env e1, type_of env e2 with
+              | Some (Forall (_, TFloat)), Some (Forall (_, TFloat)) ->
+                  Some (Forall ([], TFloat))
+              | _ -> None)
+         | And | Or ->
+             (match type_of env e1, type_of env e2 with
+              | Some (Forall (_, TBool)), Some (Forall (_, TBool)) ->
+                  Some (Forall ([], TBool))
+              | _ -> None)
+         | Lt | Lte | Gt | Gte | Eq | Neq ->
+             (match type_of env e1, type_of env e2 with
+              | Some (Forall (_, tau1)), Some (Forall (_, tau2)) when tau1 = tau2 ->
+                  Some (Forall ([], TBool))
+              | _ -> None)
+         | Concat ->
+             (match type_of env e1, type_of env e2 with
+              | Some (Forall (_, TList tau1)), Some (Forall (_, TList tau2))
+                when tau1 = tau2 ->
+                  Some (Forall ([], TList tau1))
+              | _ -> None)
+         | Cons ->
+             (match type_of env e1, type_of env e2 with
+              | Some (Forall (_, tau1)), Some (Forall (_, TList tau2))
+                when tau1 = tau2 ->
+                  Some (Forall ([], TList tau1))
+              | _ -> None)
+         | Comma -> None
+         )
+    | _ -> None
 
 exception AssertFail
 exception DivByZero
