@@ -38,6 +38,20 @@ let sort_uniq cmp lst =
   in
   uniq [] sorted
 
+  let rec string_of_ty = function
+  | TUnit -> "TUnit"
+  | TInt -> "TInt"
+  | TFloat -> "TFloat"
+  | TBool -> "TBool"
+  | TVar x -> "TVar(" ^ x ^ ")"
+  | TList t -> "TList(" ^ string_of_ty t ^ ")"
+  | TOption t -> "TOption(" ^ string_of_ty t ^ ")"
+  | TPair (t1, t2) -> "TPair(" ^ string_of_ty t1 ^ ", " ^ string_of_ty t2 ^ ")"
+  | TFun (t1, t2) -> "TFun(" ^ string_of_ty t1 ^ " -> " ^ string_of_ty t2 ^ ")"
+
+(* let string_of_constraints constraints =
+  "[" ^ String.concat "; " (List.map (fun (t1, t2) -> string_of_ty t1 ^ " = " ^ string_of_ty t2) constraints) ^ "]" *)
+
 (* Unify Function *)
 let rec unify ty constraints =
   match constraints with
@@ -67,150 +81,100 @@ let rec unify ty constraints =
   | _ -> None 
 
 (* type_of Function *)
-let rec type_of env expr =
-  match expr with
-  | Unit -> Some (Forall ([], TUnit))
-  | True | False -> Some (Forall ([], TBool))
-  | Int _ -> Some (Forall ([], TInt))
-  | Float _ -> Some (Forall ([], TFloat))
-  | Var x -> Env.find_opt x env
+let rec type_of' (ctxt: stc_env) (e: expr) : ty * (ty * ty) list =
+  let rec go e =
+    match e with
+    | Unit ->
+      let _ = print_endline "Matched Unit" in
+      TUnit, []
+    | True | False ->
+      let _ = print_endline "Matched True/False" in
+      TBool, []
+    | Int _ ->
+      let _ = print_endline "Matched Int" in
+      TInt, []
+    | Float _ ->
+      let _ = print_endline "Matched Float" in
+      TFloat, []
+    | Var x ->
+      let _ = print_endline ("Matched Var: " ^ x) in
+      let Forall (bnd_vars, t) = Env.find x ctxt in
+      let rec instantiate bnd_vars t =
+        match bnd_vars with
+        | [] -> t
+        | v :: vs -> instantiate vs (apply_subst [(v, TVar (gensym ()))] t)
+      in
+      instantiate bnd_vars t, []
+    | Annot (e, ty) ->
+      let _ = print_endline "Matched Annot" in
+      let inferred_ty, constraints = go e in
+      ty, (inferred_ty, ty) :: constraints
+    | Let { is_rec = false; name; value; body } ->
+      let _ = print_endline ("Matched Let: " ^ name) in
+      let value_ty, value_constraints = go value in
+      let body_ty, body_constraints = type_of' (Env.add name (Forall ([], value_ty)) ctxt) body in
+      body_ty, value_constraints @ body_constraints
+    | Let { is_rec = true; name; value; body } ->
+      let _ = print_endline ("Matched Recursive Let: " ^ name) in
+      (match value with
+       | Fun (arg, _, body_fun) ->
+         let arg_ty = TVar (gensym ()) in
+         let ret_ty = TVar (gensym ()) in
+         let fun_ty = TFun (arg_ty, ret_ty) in
+         let body_fun_ty, body_fun_constraints =
+           type_of' (Env.add arg (Forall ([], arg_ty)) (Env.add name (Forall ([], fun_ty)) ctxt)) body_fun
+         in
+         let constraints = (ret_ty, body_fun_ty) :: body_fun_constraints in
+         let body_ty, body_constraints = type_of' (Env.add name (Forall ([], fun_ty)) ctxt) body in
+         body_ty, constraints @ body_constraints
+       | _ -> failwith "Recursive let must bind to a function")
+    | Fun (arg, ty_opt, body) ->
+      let _ = print_endline ("Matched Fun: " ^ arg) in
+      let arg_ty = match ty_opt with Some ty -> ty | None -> TVar (gensym ()) in
+      let body_ty, body_constraints = go body in
+      TFun (arg_ty, body_ty), body_constraints
+    | App (f, arg) ->
+      let _ = print_endline "Matched App" in
+      let param_ty = TVar (gensym ()) in
+      let return_ty = TVar (gensym ()) in
+      let func_ty, func_constraints = go f in
+      let arg_ty, arg_constraints = go arg in
+      return_ty, (func_ty, TFun (param_ty, return_ty)) :: (arg_ty, param_ty) :: func_constraints @ arg_constraints
+    | Bop (Comma, e1, e2) ->
+      let _ = print_endline "Matched Pair (Bop Comma)" in
+      let t1, c1 = go e1 in
+      let t2, c2 = go e2 in
+      TPair (t1, t2), c1 @ c2
+    | PairMatch { matched; fst_name; snd_name; case } ->
+      let _ = print_endline "Matched PairMatch" in
+      let fst_ty = TVar (gensym ()) in
+      let snd_ty = TVar (gensym ()) in
+      let pair_ty = TPair (fst_ty, snd_ty) in
+      let matched_ty, matched_constraints = go matched in
+      let case_ty, case_constraints =
+        type_of' (Env.add fst_name (Forall ([], fst_ty)) (Env.add snd_name (Forall ([], snd_ty)) ctxt)) case
+      in
+      case_ty, (matched_ty, pair_ty) :: matched_constraints @ case_constraints
+    | _ -> failwith "Expression not supported in type_of'"
+  in
+  go e
 
-  | Annot (e, ty) ->
-    (match type_of env e with
-     | Some (Forall (_, inferred_ty)) ->
-       let constraints = [(inferred_ty, ty)] in
-       (match unify ty constraints with
-        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-        | None -> None)
-     | None -> None)
-
-  | Let { is_rec = false; name; value; body } ->
-  (match type_of env value with
-    | Some inferred_scheme -> 
-        let env' = Env.add name inferred_scheme env in
-        type_of env' body
-    | None -> None)
-    
-
-  | Let { is_rec = true; name; value; body } ->
-    (match value with
-     | Fun (arg, _, body_fun) ->
-       let arg_ty = TVar (gensym ()) in
-       let ret_ty = TVar (gensym ()) in
-       let fun_ty = TFun (arg_ty, ret_ty) in
-       let env' = Env.add name (Forall ([], fun_ty)) env in
-       (match type_of (Env.add arg (Forall ([], arg_ty)) env') body_fun with
-        | Some (Forall (_, inferred_ret_ty)) ->
-          let constraints = [(ret_ty, inferred_ret_ty)] in
-          (match unify fun_ty constraints with
-           | Some (Forall (_, unified_fun_ty)) ->
-             type_of (Env.add name (Forall ([], unified_fun_ty)) env) body
-           | None -> None)
-        | None -> None)
-     | _ -> None)
-
-  | Fun (arg, ty_opt, body) ->
-    let arg_ty = match ty_opt with Some ty -> ty | None -> TVar (gensym ()) in
-    let env' = Env.add arg (Forall ([], arg_ty)) env in
-    (match type_of env' body with
-     | Some (Forall (_, body_ty)) -> Some (Forall ([], TFun (arg_ty, body_ty)))
-     | _ -> None)
-
-  | App (f, arg) ->
-    let param_ty = TVar (gensym ()) in
-    let return_ty = TVar (gensym ()) in
-    (match type_of env f, type_of env arg with
-      | Some (Forall (_, func_ty)), Some (Forall (_, actual_arg_ty)) ->
-        let constraints = [(func_ty, TFun (param_ty, return_ty)); (param_ty, actual_arg_ty)] in
-        (match unify return_ty constraints with
-        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-        | None -> None)
-      | _ -> None)
-  | If (cond, e1, e2) ->
-    (match type_of env cond, type_of env e1, type_of env e2 with
-     | Some (Forall (_, TBool)), Some (Forall (_, t1)), Some (Forall (_, t2)) ->
-       let constraints = [(t1, t2)] in
-       (match unify t1 constraints with
-        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-        | None -> None)
-     | _ -> None)
-
-  | Bop (op, e1, e2) ->
-    let (result_ty, operand_ty) =
-      match op with
-      | Add | Sub | Mul | Div | Mod -> (TInt, TInt)
-      | AddF | SubF | MulF | DivF | PowF -> (TFloat, TFloat)
-      | Cons ->
-        let elem_ty = TVar (gensym ()) in
-        (TList elem_ty, elem_ty)
-      | Concat ->
-        let list_ty = TList (TVar (gensym ())) in
-        (list_ty, list_ty)
-      | Comma ->
-        let t1 = TVar (gensym ()) in
-        let t2 = TVar (gensym ()) in
-        (TPair (t1, t2), t1)
-      | Lt | Lte | Gt | Gte | Eq | Neq -> (TBool, TVar (gensym ()))
-      | And | Or -> (TBool, TBool)
-    in
-    (match type_of env e1, type_of env e2 with
-     | Some (Forall (_, t1)), Some (Forall (_, t2)) ->
-       let constraints =
-         match op with
-         | Cons -> [(t1, operand_ty); (t2, TList operand_ty)]
-         | Concat -> [(t1, operand_ty); (t2, operand_ty)]
-         | Comma -> []
-         | _ -> [(t1, operand_ty); (t2, operand_ty)]
-       in
-       (match unify result_ty constraints with
-        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-        | None -> None)
-     | _ -> None)
-
-  | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
-    let elem_ty = TVar (gensym ()) in
-    let list_ty = TList elem_ty in
-    (match type_of env matched,
-           type_of (Env.add hd_name (Forall ([], elem_ty))
-           (Env.add tl_name (Forall ([], list_ty)) env)) cons_case,
-           type_of env nil_case with
-     | Some (Forall (_, matched_ty)), Some (Forall (_, cons_ty)), Some (Forall (_, nil_ty)) ->
-       let constraints = [(matched_ty, list_ty); (cons_ty, nil_ty)] in
-       (match unify cons_ty constraints with
-        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-        | None -> None)
-     | _ -> None)
-
-  | PairMatch { matched; fst_name; snd_name; case } ->
-    let fst_ty = TVar (gensym ()) in
-    let snd_ty = TVar (gensym ()) in
-    let pair_ty = TPair (fst_ty, snd_ty) in
-    (match type_of env matched,
-           type_of (Env.add fst_name (Forall ([], fst_ty))
-           (Env.add snd_name (Forall ([], snd_ty)) env)) case with
-     | Some (Forall (_, matched_ty)), Some (Forall (_, case_ty)) ->
-       let constraints = [(matched_ty, pair_ty)] in
-       (match unify case_ty constraints with
-        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-        | None -> None)
-     | _ -> None)
-
-  | OptMatch { matched; some_name; some_case; none_case } ->
-    let elem_ty = TVar (gensym ()) in
-    let opt_ty = TOption elem_ty in
-    (match type_of env matched,
-           type_of (Env.add some_name (Forall ([], elem_ty)) env) some_case,
-           type_of env none_case with
-     | Some (Forall (_, matched_ty)), Some (Forall (_, some_ty)), Some (Forall (_, none_ty)) ->
-       let constraints = [(matched_ty, opt_ty); (some_ty, none_ty)] in
-       (match unify some_ty constraints with
-        | Some (Forall (_, unified_ty)) -> Some (Forall ([], unified_ty))
-        | None -> None)
-     | _ -> None)
-
-  | _ -> None
-
-
+(* type_of: Uses type_of' to compute the type and unify constraints *)
+let type_of ctxt e =
+  let t, c = type_of' ctxt e in
+  let _ =
+    print_endline ("Inferred type: " ^ string_of_ty t);
+    print_endline ("Constraints: " ^
+      String.concat ", " (List.map (fun (t1, t2) -> string_of_ty t1 ^ " = " ^ string_of_ty t2) c))
+  in
+  let t' = unify t (c @ [(TVar "$_out", t)]) in
+  match t' with
+  | None ->
+    let _ = print_endline "Unification failed" in
+    None
+  | Some (Forall (vars, t')) ->
+    let _ = print_endline ("Unified type: " ^ string_of_ty t') in
+    Some (Forall (vars, t'))
 
 exception AssertFail
 exception DivByZero
