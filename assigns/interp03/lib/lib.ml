@@ -255,6 +255,7 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | _ -> raise RecWithoutArg)
   | _ -> raise (Failure "Unsupported expression")
 
+
 let type_check =
   let rec go ctxt = function
   | [] -> Some (Forall ([], TUnit))
