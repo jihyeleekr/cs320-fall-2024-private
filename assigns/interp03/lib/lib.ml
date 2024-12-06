@@ -167,31 +167,31 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
   | Float f -> VFloat f
   | Var x ->
       (try Env.find x env
-       with Not_found -> assert false )
+       with Not_found -> raise (Failure ("Undefined variable: " ^ x)))
   | Assert e ->
       (match eval_expr env e with
        | VBool true -> VUnit
        | VBool false -> raise AssertFail
-       | _ -> assert false )
+       | _ -> raise (Failure "Assert expects a boolean"))
   | ENone -> VNone
   | ESome e -> VSome (eval_expr env e)
   | OptMatch { matched; some_name; some_case; none_case } ->
       (match eval_expr env matched with
        | VSome v -> eval_expr (Env.add some_name v env) some_case
        | VNone -> eval_expr env none_case
-       | _ -> assert false )
+       | _ -> raise (Failure "Option match expects Some or None"))
   | Nil -> VList []
   | Bop (Cons, hd, tl) ->
       (match eval_expr env tl with
        | VList lst -> VList (eval_expr env hd :: lst)
-       | _ -> assert false )
+       | _ -> raise (Failure "Cons expects a list"))
   | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
       (match eval_expr env matched with
        | VList (hd :: tl) ->
            let env' = Env.add hd_name hd (Env.add tl_name (VList tl) env) in
            eval_expr env' cons_case
        | VList [] -> eval_expr env nil_case
-       | _ -> assert false )
+       | _ -> raise (Failure "List match expects a list"))
   | Bop (Comma, e1, e2) ->
       let v1 = eval_expr env e1 in
       let v2 = eval_expr env e2 in
@@ -201,7 +201,7 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | VPair (v1, v2) ->
            let env' = Env.add fst_name v1 (Env.add snd_name v2 env) in
            eval_expr env' case
-       | _ -> assert false )
+       | _ -> raise (Failure "Pair match expects a pair"))
   | Bop (op, e1, e2) ->
       let v1 = eval_expr env e1 in
       let v2 = eval_expr env e2 in
@@ -220,29 +220,31 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | (Eq, v1, v2) -> VBool (v1 = v2)
        | (Neq, VClos _, _) | (Neq, _, VClos _) -> raise CompareFunVals
        | (Neq, v1, v2) -> VBool (v1 <> v2)
-       | (Lt, VClos _, _) | (Lt, _, VClos _) -> raise CompareFunVals
-       | (Lt, v1, v2) -> VBool (v1 < v2)
-       | (Lte, VClos _, _) | (Lte, _, VClos _) -> raise CompareFunVals
-       | (Lte, v1, v2) -> VBool (v1 <= v2)
-       | (Gt, VClos _, _) | (Gt, _, VClos _) -> raise CompareFunVals
-       | (Gt, v1, v2) -> VBool (v1 > v2)
-       | (Gte, VClos _, _) | (Gte, _, VClos _) -> raise CompareFunVals
-       | (Gte, v1, v2) -> VBool (v1 >= v2)
+       | (Lt, VInt n1, VInt n2) -> VBool (n1 < n2)
+       | (Lte, VInt n1, VInt n2) -> VBool (n1 <= n2)
+       | (Gt, VInt n1, VInt n2) -> VBool (n1 > n2)
+       | (Gte, VInt n1, VInt n2) -> VBool (n1 >= n2)
        | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
        | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
-       | _ -> assert false )
+       | _ -> raise (Failure "Unsupported binary operation"))
   | If (cond, then_branch, else_branch) ->
       (match eval_expr env cond with
        | VBool true -> eval_expr env then_branch
        | VBool false -> eval_expr env else_branch
-       | _ -> assert false )
+       | _ -> raise (Failure "If condition expects a boolean"))
   | Fun (arg, _, body) -> VClos { name = None; arg; body; env }
   | App (f, arg) ->
-      (match eval_expr env f with
-       | VClos { name = _; arg = param; body; env = closure_env } ->
-           let arg_val = eval_expr env arg in
-           eval_expr (Env.add param arg_val closure_env) body
-       | _ -> assert false )
+    (match eval_expr env f with
+     | VClos { name; arg = param; body; env = closure_env } ->
+         let arg_val = eval_expr env arg in
+         let env' =
+           match name with
+           | Some name -> Env.add name (VClos { name = Some name; arg = param; body; env = closure_env }) closure_env
+           | None -> closure_env
+         in
+         eval_expr (Env.add param arg_val env') body
+     | _ -> raise (Failure "Application expects a function"))
+
   | Let { is_rec = false; name; value; body } ->
       let value_val = eval_expr env value in
       eval_expr (Env.add name value_val env) body
@@ -251,8 +253,10 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
        | Fun (arg, _, body_fun) ->
            let rec_env = Env.add name (VClos { name = Some name; arg; body = body_fun; env }) env in
            eval_expr rec_env body
-       | _ -> raise RecWithoutArg )
-  | _ -> assert false
+       | _ -> raise RecWithoutArg)
+  | _ -> raise (Failure "Unsupported expression")
+
+
 
 let type_check =
   let rec go ctxt = function
