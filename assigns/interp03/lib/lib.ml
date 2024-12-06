@@ -73,6 +73,37 @@ let rec type_of env expr =
   | True | False -> Some (Forall ([], TBool))
   | Int _ -> Some (Forall ([], TInt))
   | Float _ -> Some (Forall ([], TFloat))
+  | Let { is_rec = false; name; value; body } ->
+    (match type_of env value with
+     | Some (Forall (_, inferred_ty)) -> (
+         match Env.find_opt name env with
+         | Some (Forall (_, declared_ty)) ->
+             let constraints = [(inferred_ty, declared_ty)] in
+             (match unify declared_ty constraints with
+              | Some (Forall (_, unified_ty)) ->
+                  type_of (Env.add name (Forall ([], unified_ty)) env) body
+              | None -> None)
+         | None ->
+             let env' = Env.add name (Forall ([], inferred_ty)) env in
+             type_of env' body)
+     | None -> None)
+
+     | Let { is_rec = true; name; value; body } ->
+      (match value with
+       | Fun (arg, _, body_fun) ->
+           let arg_ty = TVar (gensym ()) in
+           let ret_ty = TVar (gensym ()) in
+           let fun_ty = TFun (arg_ty, ret_ty) in
+           let env' = Env.add name (Forall ([], fun_ty)) env in
+           (match type_of (Env.add arg (Forall ([], arg_ty)) env') body_fun with
+            | Some (Forall (_, inferred_ret_ty)) ->
+                let constraints = [(ret_ty, inferred_ret_ty)] in
+                (match unify fun_ty constraints with
+                 | Some (Forall (_, unified_fun_ty)) ->
+                     type_of (Env.add name (Forall ([], unified_fun_ty)) env) body
+                 | None -> None)
+            | None -> None)
+       | _ -> None)
   | Var x -> Env.find_opt x env
   | Fun (arg, ty_opt, body) ->
     let arg_ty = match ty_opt with Some ty -> ty | None -> TVar (gensym ()) in
