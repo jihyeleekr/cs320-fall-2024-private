@@ -5,5 +5,5 @@ let sum_of_squares x y =
   x_squared + y_squared
   let _ = assert ( sum_of_squares 3 ( -5) = 34) *)
 
-let b : bool = true
+let x: int = 3
 (* let test : unit = assert (b) *) 
