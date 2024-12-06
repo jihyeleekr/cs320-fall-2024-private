@@ -206,27 +206,27 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
       let v1 = eval_expr env e1 in
       let v2 = eval_expr env e2 in
       (match (op, v1, v2) with
-        | (Add, VInt n1, VInt n2) -> VInt (n1 + n2)
-        | (Sub, VInt n1, VInt n2) -> VInt (n1 - n2)
-        | (Mul, VInt n1, VInt n2) -> VInt (n1 * n2)
-        | (Div, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt (n1 / n2)
-        | (Mod, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt (n1 mod n2)
-        | (AddF, VFloat f1, VFloat f2) -> VFloat (f1 +. f2)
-        | (SubF, VFloat f1, VFloat f2) -> VFloat (f1 -. f2)
-        | (MulF, VFloat f1, VFloat f2) -> VFloat (f1 *. f2)
-        | (DivF, VFloat f1, VFloat f2) -> if f2 = 0.0 then raise DivByZero else VFloat (f1 /. f2)
-        | (PowF, VFloat f1, VFloat f2) -> VFloat (f1 ** f2)
-        | (Eq, VClos _, _) | (Eq, _, VClos _) -> raise CompareFunVals
-        | (Eq, v1, v2) -> VBool (v1 = v2)
-        | (Neq, VClos _, _) | (Neq, _, VClos _) -> raise CompareFunVals
-        | (Neq, v1, v2) -> VBool (v1 <> v2)
-        | (Lt, VInt n1, VInt n2) -> VBool (n1 < n2)
-        | (Lte, VInt n1, VInt n2) -> VBool (n1 <= n2)
-        | (Gt, VInt n1, VInt n2) -> VBool (n1 > n2)
-        | (Gte, VInt n1, VInt n2) -> VBool (n1 >= n2)
-        | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
-        | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
-        | _ -> raise (Failure "Unsupported binary operation"))
+       | (Add, VInt n1, VInt n2) -> VInt (n1 + n2)
+       | (Sub, VInt n1, VInt n2) -> VInt (n1 - n2)
+       | (Mul, VInt n1, VInt n2) -> VInt (n1 * n2)
+       | (Div, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt (n1 / n2)
+       | (Mod, VInt n1, VInt n2) -> if n2 = 0 then raise DivByZero else VInt (n1 mod n2)
+       | (AddF, VFloat f1, VFloat f2) -> VFloat (f1 +. f2)
+       | (SubF, VFloat f1, VFloat f2) -> VFloat (f1 -. f2)
+       | (MulF, VFloat f1, VFloat f2) -> VFloat (f1 *. f2)
+       | (DivF, VFloat f1, VFloat f2) -> if f2 = 0.0 then raise DivByZero else VFloat (f1 /. f2)
+       | (PowF, VFloat f1, VFloat f2) -> VFloat (f1 ** f2)
+       | (Eq, VClos _, _) | (Eq, _, VClos _) -> raise CompareFunVals
+       | (Eq, v1, v2) -> VBool (v1 = v2)
+       | (Neq, VClos _, _) | (Neq, _, VClos _) -> raise CompareFunVals
+       | (Neq, v1, v2) -> VBool (v1 <> v2)
+       | (Lt, VInt n1, VInt n2) -> VBool (n1 < n2)
+       | (Lte, VInt n1, VInt n2) -> VBool (n1 <= n2)
+       | (Gt, VInt n1, VInt n2) -> VBool (n1 > n2)
+       | (Gte, VInt n1, VInt n2) -> VBool (n1 >= n2)
+       | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
+       | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
+       | _ -> raise (Failure "Unsupported binary operation"))
   | If (cond, then_branch, else_branch) ->
       (match eval_expr env cond with
        | VBool true -> eval_expr env then_branch
@@ -254,9 +254,6 @@ let rec eval_expr (env : dyn_env) (expr : expr) : value =
            eval_expr rec_env body
        | _ -> raise RecWithoutArg)
   | _ -> raise (Failure "Unsupported expression")
-
-
-
 
 let type_check =
   let rec go ctxt = function
