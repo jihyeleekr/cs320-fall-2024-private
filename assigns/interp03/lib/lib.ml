@@ -276,22 +276,23 @@ exception DivByZero
 exception RecWithoutArg
 exception CompareFunVals
 
-let rec eval_expr env expr : value = 
+let rec eval_expr env expr : value =
   let rec go = function
-  | Unit -> VUnit 
-  | True -> VBool true 
-  | False -> VBool false 
+  | Unit -> VUnit
+  | True -> VBool true
+  | False -> VBool false
   | Int n -> VInt n
   | Float f -> VFloat f
   | ENone -> VNone
   | Nil -> VList []
   | Var x -> (
-        Env.find x env)
-  | Fun (x, _, body) -> VClos {name=None; arg = x; body; env}
-
+      try Env.find x env
+      with Not_found -> failwith "Undefined variable"
+    )
+  | Fun (x, _, body) -> VClos { name = None; arg = x; body; env }
   | App (e1, e2) -> (
-        match go e1 with
-        | VClos { env; name; arg; body } ->
+      match go e1 with
+      | VClos { env; name; arg; body } ->
           let env =
             match name with
             | None -> env
@@ -299,212 +300,168 @@ let rec eval_expr env expr : value =
           in
           let env = Env.add arg (go e2) env in
           eval_expr env body
-        | _ -> failwith "impossible"
-      )
-
-  | Bop (Add, e1, e2) -> 
-      (match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m+n)
-      | _ -> failwith "impossible")
-
-  | Bop (AddF, e1, e2) -> 
-        (match go e1, go e2 with
-        | VFloat m, VFloat n -> VFloat (m+.n)
-        | _ -> failwith "impossible")
-
-  | Bop (Sub, e1, e2) -> 
-      (match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m-n)
-      | _ -> failwith "impossible")
-
-  | Bop (SubF, e1, e2) -> 
-      (match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m-.n)
-      | _ -> failwith "impossible")
-
-  | Bop (Mul, e1, e2) -> 
-      (match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m*n)
-      | _ -> failwith "impossible")
-
-  | Bop (MulF, e1, e2) -> 
-        (match go e1, go e2 with
-        | VFloat m, VFloat n -> VFloat (m*.n)
-        | _ -> failwith "impossible")
-
-  | Bop (Div, e1, e2) -> 
-      (match go e1 with
-      | (VInt m) -> (
-          match go e2 with
-          | (VInt 0) -> raise DivByZero
-          | (VInt n) -> (VInt (m / n))
-          | _ -> failwith ( ("" ))
-        )
-        | _ -> failwith  ("" )) 
-
-  | Bop (DivF, e1, e2) -> 
-    (match go e1 with
-    | (VFloat m) -> (
-        match go e2 with
-        | (VFloat n) -> (VFloat (m /. n))
-        | _ ->  (failwith ("" ))
-      )
-      | _ ->  (failwith ("" )) )
-
+      | _ -> failwith "impossible"
+    )
+  | Bop (Add, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m + n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (AddF, e1, e2) -> (
+      match go e1, go e2 with
+      | VFloat m, VFloat n -> VFloat (m +. n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (Sub, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m - n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (SubF, e1, e2) -> (
+      match go e1, go e2 with
+      | VFloat m, VFloat n -> VFloat (m -. n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (Mul, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m * n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (MulF, e1, e2) -> (
+      match go e1, go e2 with
+      | VFloat m, VFloat n -> VFloat (m *. n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (Div, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt _, VInt 0 -> raise DivByZero
+      | VInt m, VInt n -> VInt (m / n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (DivF, e1, e2) -> (
+      match go e1, go e2 with
+      | VFloat m, VFloat n when n <> 0.0 -> VFloat (m /. n)
+      | _ -> failwith "impossible"
+    )
   | Bop (Mod, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n when n <> 0 -> VInt (m mod n)
       | VInt _, VInt 0 -> failwith "Division by zero in modulo operation"
-      | _ -> failwith "Modulo operation requires two numbers")
-
-  | Bop (PowF, e1, e2) -> 
-        (match go e1, go e2 with
-        | VFloat m, VFloat n -> VFloat (m**n)
-        | _ -> failwith "impossible")
-
-  | Bop (Eq, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m=n)
-    | VInt m, VInt n  -> VBool(m=n)
-    | _ -> failwith "must be 2 of same numerical type")
-
-  | Bop (Neq, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<>n)
-    | VInt m, VInt n  -> VBool(m<>n)
-    | _ -> failwith "must be 2 of same numerical type")
-  
-  | Bop (Lt, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<n)
-    | VInt m, VInt n  -> VBool(m<n)
-    | _ -> failwith "must be 2 of same numerical type")
-  
-  | Bop (Lte, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<=n)
-    | VInt m, VInt n  -> VBool(m<=n)
-    | _ -> failwith "must be 2 of same numerical type")
-
-  | Bop (Gt, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m>n)
-    | VInt m, VInt n  -> VBool(m>n)
-    | _ -> failwith "must be 2 of same numerical type")
-
-  | Bop (Gte, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m>=n)
-    | VInt m, VInt n  -> VBool(m>=n)
-    | _ -> failwith "must be 2 of same numerical type")
-
+      | _ -> failwith "Modulo operation requires two numbers"
+    )
+  | Bop (PowF, e1, e2) -> (
+      match go e1, go e2 with
+      | VFloat m, VFloat n -> VFloat (m ** n)
+      | _ -> failwith "impossible"
+    )
+  | Bop (Eq, e1, e2) -> (
+      match go e1, go e2 with
+      | VClos _, _ | _, VClos _ -> raise CompareFunVals
+      | VInt m, VInt n -> VBool (m = n)
+      | VFloat m, VFloat n -> VBool (m = n)
+      | _ -> failwith "must be 2 of same numerical type"
+    )
+  | Bop (Neq, e1, e2) -> (
+      match go e1, go e2 with
+      | VClos _, _ | _, VClos _ -> raise CompareFunVals
+      | VInt m, VInt n -> VBool (m <> n)
+      | VFloat m, VFloat n -> VBool (m <> n)
+      | _ -> failwith "must be 2 of same numerical type"
+    )
+  | Bop (Lt, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m < n)
+      | VFloat m, VFloat n -> VBool (m < n)
+      | _ -> failwith "must be 2 of same numerical type"
+    )
+  | Bop (Lte, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m <= n)
+      | VFloat m, VFloat n -> VBool (m <= n)
+      | _ -> failwith "must be 2 of same numerical type"
+    )
+  | Bop (Gt, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m > n)
+      | VFloat m, VFloat n -> VBool (m > n)
+      | _ -> failwith "must be 2 of same numerical type"
+    )
+  | Bop (Gte, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m >= n)
+      | VFloat m, VFloat n -> VBool (m >= n)
+      | _ -> failwith "must be 2 of same numerical type"
+    )
   | Bop (And, e1, e2) -> (
       match go e1 with
       | VBool false -> VBool false
       | VBool true -> go e2
-      | _ -> failwith ( "Logical 'and' requires boolean operands")
-      )
+      | _ -> failwith "Logical 'and' requires boolean operands"
+    )
   | Bop (Or, e1, e2) -> (
-        match go e1 with
-        | VBool true -> VBool true
-        | VBool false -> go e2
-        | _ -> failwith ( "Logical 'or' requires boolean operands")
-  )
-
-  | ESome e ->
-    let v = eval_expr  env e in
-    VSome v
-
-  | OptMatch {matched; some_name; some_case; none_case} ->
-      (match eval_expr env matched  with
-      | VSome v -> eval_expr  (Env.add some_name v env) some_case
-      | VNone -> eval_expr env none_case 
-      | _ -> failwith "Expected an option")
-
-
+      match go e1 with
+      | VBool true -> VBool true
+      | VBool false -> go e2
+      | _ -> failwith "Logical 'or' requires boolean operands"
+    )
+  | Bop (Comma, e1, e2) -> VPair (go e1, go e2)
+  | Bop (Concat, e1, e2) -> (
+      match go e1, go e2 with
+      | VList lst1, VList lst2 -> VList (lst1 @ lst2)
+      | _ -> failwith "Both operands of Concat must be lists"
+    )
+  | Bop (Cons, e1, e2) -> (
+      match go e2 with
+      | VList lst -> VList (go e1 :: lst)
+      | _ -> failwith "Expected a list on the right-hand side of Cons"
+    )
   | If (e1, e2, e3) -> (
-        match go e1 with
-        | VBool true -> go e2
-        | VBool false -> go e3
-        | _ -> failwith ( "Condition in if-expression must be a boolean")
-      )
-
-| Bop (Comma, e1, e2) -> 
-    let v1 = go e1 in
-    let v2 = go e2 in
-    VPair (v1, v2)
-
-| Bop (Cons, e1, e2) -> 
-    let v1 = go e1 in
-    let v2 = go e2 in
-    (match v2 with
-    | VList lst -> VList (v1 :: lst)
-    | _ -> failwith "Expected a list on the right-hand side of Cons")
-
-| ListMatch { matched; hd_name; tl_name; cons_case; nil_case } -> (
-    match go matched with
-    | VList (vh :: vt) ->
-        let env = Env.add hd_name vh env in
-        let env = Env.add tl_name (VList vt) env in
-        eval_expr env cons_case 
-    | VList [] -> eval_expr env nil_case 
-    | _ -> failwith "Expected a list"
-)
-
-| PairMatch { matched; fst_name; snd_name; case } -> (
-    match go matched with
-    | VPair (v1, v2) ->
-        let env = Env.add fst_name v1 env in
-        let env = Env.add snd_name v2 env in
-        eval_expr env case 
-    | _ -> failwith "Expected a pair"
-) 
-| Bop (Concat, e1, e2) ->
-  let v1 = go e1 in
-  let v2 = go e2 in
-  (match (v1, v2) with
-  | (VList lst1, VList lst2) -> VList (lst1 @ lst2)
-  | _ -> failwith "Both operands of Concat must be lists")     
-
-| Assert e1 ->
-    (match go e1 with
-    | (VBool true) -> VUnit
-    | (VBool false) -> raise AssertFail
-    | _ -> raise AssertFail)
-
-| Let { is_rec = false; name; value; body } ->
-    let v1 = go value in
-    let new_env = Env.add name v1 env in
-    eval_expr new_env body 
-
-| Let { is_rec = true; name = f; value = e1; body = e2 } ->
-      let closure = 
-        (match eval_expr env e1  with
-        | VClos { name = None; arg; body = closure_body; env = closure_env } ->
-            VClos { name = Some f; arg; body = closure_body; env = closure_env }
-        | VClos { name = Some _; _ } ->
-          raise RecWithoutArg
-        | _ -> failwith ( "Expected a closure in recursive let binding"))
-      in
-      let updated_env = Env.add f closure env in
-      eval_expr updated_env  e2 
-| Annot (e, _) ->
-    eval_expr env e 
-
-in
-go expr
+      match go e1 with
+      | VBool true -> go e2
+      | VBool false -> go e3
+      | _ -> failwith "Condition in if-expression must be a boolean"
+    )
+  | ESome e -> VSome (go e)
+  | OptMatch { matched; some_name; some_case; none_case } -> (
+      match go matched with
+      | VSome v -> eval_expr (Env.add some_name v env) some_case
+      | VNone -> eval_expr env none_case
+      | _ -> failwith "Expected an option"
+    )
+  | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } -> (
+      match go matched with
+      | VList (vh :: vt) ->
+          let env = Env.add hd_name vh (Env.add tl_name (VList vt) env) in
+          eval_expr env cons_case
+      | VList [] -> eval_expr env nil_case
+      | _ -> failwith "Expected a list"
+    )
+  | PairMatch { matched; fst_name; snd_name; case } -> (
+      match go matched with
+      | VPair (v1, v2) ->
+          let env = Env.add fst_name v1 (Env.add snd_name v2 env) in
+          eval_expr env case
+      | _ -> failwith "Expected a pair"
+    )
+  | Let { is_rec = false; name; value; body } ->
+      let v1 = go value in
+      eval_expr (Env.add name v1 env) body
+  | Let { is_rec = true; name = f; value = e1; body = e2 } -> (
+      match eval_expr env e1 with
+      | VClos { name = None; arg; body = closure_body; env = closure_env } ->
+          let closure = VClos { name = Some f; arg; body = closure_body; env = closure_env } in
+          eval_expr (Env.add f closure env) e2
+      | _ -> failwith "Expected a closure in recursive let binding"
+    )
+  | Annot (e, _) -> go e
+  | Assert e1 -> (
+      match go e1 with
+      | VBool true -> VUnit
+      | VBool false -> raise AssertFail
+      | _ -> raise AssertFail
+    )
+  in
+  go expr
 
 
 
