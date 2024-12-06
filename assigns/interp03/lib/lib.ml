@@ -38,7 +38,7 @@ let sort_uniq cmp lst =
   in
   uniq [] sorted
 
-  let rec string_of_ty = function
+  (* let rec string_of_ty = function
   | TUnit -> "TUnit"
   | TInt -> "TInt"
   | TFloat -> "TFloat"
@@ -47,11 +47,13 @@ let sort_uniq cmp lst =
   | TList t -> "TList(" ^ string_of_ty t ^ ")"
   | TOption t -> "TOption(" ^ string_of_ty t ^ ")"
   | TPair (t1, t2) -> "TPair(" ^ string_of_ty t1 ^ ", " ^ string_of_ty t2 ^ ")"
-  | TFun (t1, t2) -> "TFun(" ^ string_of_ty t1 ^ " -> " ^ string_of_ty t2 ^ ")"
+  | TFun (t1, t2) -> "TFun(" ^ string_of_ty t1 ^ " -> " ^ string_of_ty t2 ^ ")" *)
 
 (* let string_of_constraints constraints =
   "[" ^ String.concat "; " (List.map (fun (t1, t2) -> string_of_ty t1 ^ " = " ^ string_of_ty t2) constraints) ^ "]" *)
-
+  let instantiate (vars, ty) =
+    let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
+    apply_subst subst ty
 (* Unify Function *)
 let rec unify ty constraints =
   match constraints with
@@ -81,7 +83,100 @@ let rec unify ty constraints =
   | _ -> None 
 
 (* type_of Function *)
-let rec type_of' (ctxt: stc_env) (e: expr) : ty * (ty * ty) list =
+let type_of (env : stc_env) (e : expr) : ty_scheme option =
+  let rec infer env = function
+    | Unit -> (TUnit, [])
+    | True | False -> (TBool, [])
+    | Int _ -> (TInt, [])
+    | Float _ -> (TFloat, [])
+    | Var x -> (
+        match Env.find_opt x env with
+        | Some (Forall (vars, t)) -> (instantiate (vars, t), [])
+        | None -> failwith ("Unbound variable: " ^ x)
+      )
+    | ENone -> (TOption (TVar (gensym ())), [])
+    | ESome e ->
+      let t, c = infer env e in
+      (TOption t, c)
+    | Nil -> (TList (TVar (gensym ())), [])
+    | OptMatch { matched; some_name; some_case; none_case } ->
+      let t_matched, c_matched = infer env matched in
+      let fresh = TVar (gensym ()) in
+      let env_some = Env.add some_name (Forall ([], fresh)) env in
+      let t_some_case, c_some = infer env_some some_case in
+      let t_none_case, c_none = infer env none_case in
+      let c = (t_matched, TOption fresh) :: (t_some_case, t_none_case) :: c_matched @ c_some @ c_none in
+      (t_some_case, c)
+    | Bop (op, e1, e2) -> (
+        let t1, c1 = infer env e1 in
+        let t2, c2 = infer env e2 in
+        match op with
+        | Add | Sub | Mul | Div | Mod ->
+            (TInt, (t1, TInt) :: (t2, TInt) :: c1 @ c2)
+        | AddF | SubF | MulF | DivF | PowF ->
+            (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
+        | And | Or ->
+            (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
+        | Eq | Neq | Lt | Lte | Gt | Gte ->
+            let fresh = TVar (gensym ()) in
+            (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
+        | Cons ->
+          (TList t1, (t2, TList t1) :: c1 @ c2)
+        | Concat ->
+          let fresh = TVar (gensym ()) in
+          (TList fresh, (t1, TList fresh) :: (t2, TList fresh) :: c1 @ c2)
+        | Comma ->
+          (TPair (t1, t2), c1 @ c2)
+      )
+    | If (e1, e2, e3) ->
+        let t1, c1 = infer env e1 in
+        let t2, c2 = infer env e2 in
+        let t3, c3 = infer env e3 in
+        (t2, (t1, TBool) :: (t2, t3) :: c1 @ c2 @ c3)
+    | Fun (x, ty_opt, body) ->
+        let arg_ty = match ty_opt with Some ty -> ty | None -> TVar (gensym ()) in
+        let env = Env.add x (Forall ([], arg_ty)) env in 
+        let t_body, c_body = infer env body in
+        (TFun (arg_ty, t_body), c_body)
+    | App (e1, e2) ->
+        let t_fun, c_fun = infer env e1 in
+        let t_arg, c_arg = infer env e2 in
+        let fresh = TVar (gensym ()) in
+        (fresh, (t_fun, TFun (t_arg, fresh)) :: c_fun @ c_arg)
+    | Let { name; value; body; _} ->
+        let t_val, c_val = infer env value in
+        let env = Env.add name (Forall([], t_val)) env in  
+        let t_body, c_body = infer env body in
+        (t_body, c_val @ c_body)
+    | PairMatch { matched; fst_name; snd_name; case } ->
+      let t_matched, c_matched = infer env matched in
+      let fresh1 = TVar (gensym ()) in
+      let fresh2 = TVar (gensym ()) in
+      let extended_env = Env.add fst_name (Forall ([], fresh1)) (Env.add snd_name (Forall ([], fresh2)) env) in
+      let t_case, c_case = infer extended_env case in
+      (t_case, (t_matched, TPair (fresh1, fresh2)) :: c_matched @ c_case)
+    | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
+        let t_matched, c_matched = infer env matched in
+        let fresh = TVar (gensym ()) in
+        let extended_env = 
+          Env.add hd_name (Forall ([], fresh)) 
+            (Env.add tl_name (Forall ([], TList fresh)) env)
+        in
+        let t_cons_case, c_cons_case = infer extended_env cons_case in
+        let t_nil_case, c_nil_case = infer env nil_case in
+        (t_nil_case, 
+          (t_matched, TList fresh) :: (t_cons_case, t_nil_case) :: 
+          c_matched @ c_cons_case @ c_nil_case)
+    | _ -> failwith "Expression not supported"
+  in
+  try
+    let t, c = infer env e in
+    match unify t c with
+    | Some t' -> Some t'
+    | None -> None
+  with _ -> None
+
+(* let rec type_of' (ctxt: stc_env) (e: expr) : ty * (ty * ty) list =
   let rec go e =
     match e with
     | Unit ->
@@ -174,7 +269,7 @@ let type_of ctxt e =
     None
   | Some (Forall (vars, t')) ->
     let _ = print_endline ("Unified type: " ^ string_of_ty t') in
-    Some (Forall (vars, t'))
+    Some (Forall (vars, t')) *)
 
 exception AssertFail
 exception DivByZero
