@@ -233,36 +233,8 @@ let rec eval_expr env expr : value =
       | VInt m, VInt n -> VInt (m / n)
       | _ -> failwith "Div requires two integers"
     )
-  | Bop (Mod, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt _, VInt 0 -> failwith "Division by zero in modulo"
-      | VInt m, VInt n -> VInt (m mod n)
-      | _ -> failwith "Mod requires two integers"
-    )
   | Bop (Eq, e1, e2) -> VBool (go e1 = go e2)
   | Bop (Neq, e1, e2) -> VBool (go e1 <> go e2)
-  | Bop (Lt, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VBool (m < n)
-      | VFloat m, VFloat n -> VBool (m < n)
-      | _ -> failwith "Lt requires comparable types"
-    )
-  | Bop (And, e1, e2) -> (
-      match go e1 with
-      | VBool false -> VBool false
-      | VBool true -> go e2
-      | _ -> failwith "And requires boolean operands"
-    )
-  | Bop (Cons, e1, e2) -> (
-      match go e2 with
-      | VList lst -> VList (go e1 :: lst)
-      | _ -> failwith "Cons requires a list as the second operand"
-    )
-  | Bop (Concat, e1, e2) -> (
-      match go e1, go e2 with
-      | VList lst1, VList lst2 -> VList (lst1 @ lst2)
-      | _ -> failwith "Concat requires two lists"
-    )
   | If (e1, e2, e3) -> (
       match go e1 with
       | VBool true -> go e2
@@ -308,10 +280,9 @@ let rec eval_expr env expr : value =
       | _ -> failwith "Let rec requires a function"
     )
   | Annot (e, _) -> go e
-  | _ -> failwith "Impossilbe"
+  | _ -> failwith "Unhandled expression"
   in
   go expr
-
 
 
 let type_check =
