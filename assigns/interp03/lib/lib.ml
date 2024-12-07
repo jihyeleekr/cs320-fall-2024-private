@@ -106,25 +106,26 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
         | Eq | Neq -> (
-            match t1, t2 with
-            | TUnit, TUnit
-            | TInt, TInt
-            | TFloat, TFloat
-            | TBool, TBool -> (TBool, c1 @ c2)
-            | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 -> (TBool, c1 @ c2)
-            | TPair (t1a, t1b), TPair (t2a, t2b) -> 
-                (TBool, (t1a, t2a) :: (t1b, t2b) :: c1 @ c2)
-            | TOption t1, TOption t2 -> (TBool, (t1, t2) :: c1 @ c2)
-            | _ -> failwith "Equality requires comparable types"
-        )
-          
+          match t1, t2 with
+          | TUnit, TUnit
+          | TInt, TInt
+          | TFloat, TFloat
+          | TBool, TBool -> (TBool, c1 @ c2)      
+          | TList t_elem1, TList t_elem2 -> 
+              if t_elem1 = t_elem2 then (TBool, c1 @ c2)
+              else failwith "Lists must have the same element type for comparison"      
+          | TPair (t1a, t1b), TPair (t2a, t2b) -> 
+              (TBool, (t1a, t2a) :: (t1b, t2b) :: c1 @ c2)      
+          | TOption t_elem1, TOption t_elem2 -> 
+              (TBool, (t_elem1, t_elem2) :: c1 @ c2)      
+          | _ -> failwith "Equality requires comparable types"
+      )
         | Lt | Lte | Gt | Gte -> (
             match t1, t2 with
             | TInt, TInt
             | TFloat, TFloat -> (TBool, c1 @ c2)
             | _ -> failwith "Comparison requires numerical types"
         )
-        
         | Cons ->
           let t1, c1 = infer env e1 in
           let t2, c2 = infer env e2 in
@@ -289,13 +290,19 @@ let rec eval_expr env expr : value =
         | VFloat m, VFloat n -> VFloat (m**n)
         | _ -> failwith "impossible")
 
-  | Bop (Eq, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m=n)
-    | VInt m, VInt n  -> VBool(m=n)
-    | _ -> failwith "must be 2 of same numerical type")
+  | Bop (Eq, e1, e2) ->
+    (match go e1, go e2 with
+    | VClos _, _ | _, VClos _ -> raise CompareFunVals
+    | VInt m, VInt n -> VBool (m = n)
+    | VFloat m, VFloat n -> VBool (m = n)
+    | VBool m, VBool n -> VBool (m = n)
+    | VUnit, VUnit -> VBool true
+    | VList lst1, VList lst2 -> VBool (lst1 = lst2)
+    | VPair (v1a, v1b), VPair (v2a, v2b) -> VBool (v1a = v2a && v1b = v2b)
+    | VSome v1, VSome v2 -> VBool (v1 = v2)
+    | VNone, VNone -> VBool true
+    | _ -> VBool false)
+      
 
   | Bop (Neq, e1, e2)  -> 
     (match go e1, go e2 with 

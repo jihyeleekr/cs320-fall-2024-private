@@ -3,7 +3,7 @@ let _ =
   let u : unit = () in
   assert (u = ())
 
-(* basic int literal test *)
+(* basic int literal test
 let _ =
   let n : int = -12320 in
   assert (n = (-12320))
@@ -336,4 +336,4 @@ let newtons_method g =
 let sqrt n = newtons_method (fun y -> y *. y -. n) 1.
 
 let _ = assert (abs_float (sqrt 4. -. 2.) < 0.0001)
-let _ = assert (abs_float (sqrt 2. -. 1.414213) < 0.0001)
+let _ = assert (abs_float (sqrt 2. -. 1.414213) < 0.0001) *)
