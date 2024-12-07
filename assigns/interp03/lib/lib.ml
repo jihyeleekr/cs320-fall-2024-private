@@ -235,12 +235,6 @@ let rec eval_expr env expr : value =
     )
   | Bop (Eq, e1, e2) -> VBool (go e1 = go e2)
   | Bop (Neq, e1, e2) -> VBool (go e1 <> go e2)
-  | Bop (Lt, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VBool (m < n)
-      | VFloat m, VFloat n -> VBool (m < n)
-      | _ -> failwith "Lt requires comparable types"
-    )
   | Bop (Cons, e1, e2) -> (
       match go e2 with
       | VList lst -> VList (go e1 :: lst)
@@ -294,6 +288,7 @@ let rec eval_expr env expr : value =
   | _ -> failwith "Unhandled expression"
   in
   go expr
+
 
 
 let type_check =
