@@ -109,12 +109,17 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             let fresh = TVar (gensym ()) in
             (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
         | Cons ->
-          let fresh = TVar (gensym ()) in
-          (TList fresh, (t1, fresh) :: (t2, TList fresh) :: c1 @ c2)
+          let t1, c1 = infer env e1 in
+          let t2, c2 = infer env e2 in
+          (TList t1, (t2, TList t1) :: c1 @ c2)
         | Concat ->
+          let t1, c1 = infer env e1 in
+          let t2, c2 = infer env e2 in
           let fresh = TVar (gensym ()) in
           (TList fresh, (t1, TList fresh) :: (t2, TList fresh) :: c1 @ c2)
         | Comma ->
+          let t1, c1 = infer env e1 in
+          let t2, c2 = infer env e2 in
           (TPair (t1, t2), c1 @ c2)
       )
     | If (e1, e2, e3) ->
@@ -138,14 +143,16 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         (fresh, (t_fun, TFun (t_arg, fresh)) :: c_fun @ c_arg)
     | Let { name; value; body; _} ->
         let t_val, c_val = infer env value in
-        let free_in_env =
-          List.concat (List.map (fun (_, Forall (_, t)) -> free_vars t) (Env.to_list env)) in
-        let free_in_t_val = free_vars t_val in
-        let generalized = List.filter (fun v -> not (List.mem v free_in_env)) free_in_t_val in
-        let generalized_ty = Forall (generalized, t_val) in
-        let env = Env.add name generalized_ty env in
+        let env = Env.add name (Forall([], t_val)) env in  
         let t_body, c_body = infer env body in
         (t_body, c_val @ c_body)
+    | Assert False -> (TVar (gensym ()), [])
+    | Assert e ->
+      let t, c = infer env e in
+      (TUnit, (t, TBool) :: c)
+    | Annot (e, ty) ->
+        let t, c = infer env e in
+        (ty, (t, ty) :: c)
     | PairMatch { matched; fst_name; snd_name; case } ->
       let t_matched, c_matched = infer env matched in
       let fresh1 = TVar (gensym ()) in
@@ -165,22 +172,14 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         (t_nil_case, 
           (t_matched, TList fresh) :: (t_cons_case, t_nil_case) :: 
           c_matched @ c_cons_case @ c_nil_case)
-    | Assert e ->
-        let t, c = infer env e in
-        (TUnit, (t, TBool) :: c)
-    | Annot (e, ty) ->
-        let t, c = infer env e in
-        (ty, (t, ty) :: c)
   in
   try
     let t, c = infer env e in
-    match unify t c with
-    | Some (Forall (vars, ty)) -> Some (Forall (vars, ty))
+    let t = unify t c in
+    match t with
+    | Some t -> Some t 
     | None -> None
   with _ -> None
-
-
-
 
 exception AssertFail
 exception DivByZero
@@ -198,179 +197,118 @@ let rec eval_expr env expr : value =
   | Nil -> VList []
   | Var x -> (
       try Env.find x env
-      with Not_found -> failwith "Undefined variable"
+      with Not_found -> failwith ("Undefined variable: " ^ x)
     )
   | Fun (x, _, body) -> VClos { name = None; arg = x; body; env }
   | App (e1, e2) -> (
       match go e1 with
-      | VClos { env; name; arg; body } ->
-          let env =
+      | VClos { env = closure_env; name; arg; body } ->
+          let closure_env =
             match name with
-            | None -> env
-            | Some name -> Env.add name (VClos { env; name = Some name; arg; body }) env
+            | None -> closure_env
+            | Some n -> Env.add n (VClos { env = closure_env; name = Some n; arg; body }) closure_env
           in
-          let env = Env.add arg (go e2) env in
-          eval_expr env body
-      | _ -> failwith "impossible"
+          let closure_env = Env.add arg (go e2) closure_env in
+          eval_expr closure_env body
+      | _ -> failwith "Expected a function for application"
     )
   | Bop (Add, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n -> VInt (m + n)
-      | _ -> failwith "impossible"
-    )
-  | Bop (AddF, e1, e2) -> (
-      match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m +. n)
-      | _ -> failwith "impossible"
+      | _ -> failwith "Add requires two integers"
     )
   | Bop (Sub, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n -> VInt (m - n)
-      | _ -> failwith "impossible"
-    )
-  | Bop (SubF, e1, e2) -> (
-      match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m -. n)
-      | _ -> failwith "impossible"
+      | _ -> failwith "Sub requires two integers"
     )
   | Bop (Mul, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n -> VInt (m * n)
-      | _ -> failwith "impossible"
-    )
-  | Bop (MulF, e1, e2) -> (
-      match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m *. n)
-      | _ -> failwith "impossible"
+      | _ -> failwith "Mul requires two integers"
     )
   | Bop (Div, e1, e2) -> (
       match go e1, go e2 with
       | VInt _, VInt 0 -> raise DivByZero
       | VInt m, VInt n -> VInt (m / n)
-      | _ -> failwith "impossible"
-    )
-  | Bop (DivF, e1, e2) -> (
-      match go e1, go e2 with
-      | VFloat m, VFloat n when n <> 0.0 -> VFloat (m /. n)
-      | _ -> failwith "impossible"
+      | _ -> failwith "Div requires two integers"
     )
   | Bop (Mod, e1, e2) -> (
       match go e1, go e2 with
-      | VInt m, VInt n when n <> 0 -> VInt (m mod n)
-      | VInt _, VInt 0 -> failwith "Division by zero in modulo operation"
-      | _ -> failwith "Modulo operation requires two numbers"
+      | VInt _, VInt 0 -> failwith "Division by zero in modulo"
+      | VInt m, VInt n -> VInt (m mod n)
+      | _ -> failwith "Mod requires two integers"
     )
-  | Bop (PowF, e1, e2) -> (
-      match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m ** n)
-      | _ -> failwith "impossible"
-    )
-  | Bop (Eq, e1, e2) -> (
-      match go e1, go e2 with
-      | VClos _, _ | _, VClos _ -> raise CompareFunVals
-      | VInt m, VInt n -> VBool (m = n)
-      | VFloat m, VFloat n -> VBool (m = n)
-      | _ -> failwith "must be 2 of same numerical type"
-    )
-  | Bop (Neq, e1, e2) -> (
-      match go e1, go e2 with
-      | VClos _, _ | _, VClos _ -> raise CompareFunVals
-      | VInt m, VInt n -> VBool (m <> n)
-      | VFloat m, VFloat n -> VBool (m <> n)
-      | _ -> failwith "must be 2 of same numerical type"
-    )
+  | Bop (Eq, e1, e2) -> VBool (go e1 = go e2)
+  | Bop (Neq, e1, e2) -> VBool (go e1 <> go e2)
   | Bop (Lt, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n -> VBool (m < n)
       | VFloat m, VFloat n -> VBool (m < n)
-      | _ -> failwith "must be 2 of same numerical type"
-    )
-  | Bop (Lte, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VBool (m <= n)
-      | VFloat m, VFloat n -> VBool (m <= n)
-      | _ -> failwith "must be 2 of same numerical type"
-    )
-  | Bop (Gt, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VBool (m > n)
-      | VFloat m, VFloat n -> VBool (m > n)
-      | _ -> failwith "must be 2 of same numerical type"
-    )
-  | Bop (Gte, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VBool (m >= n)
-      | VFloat m, VFloat n -> VBool (m >= n)
-      | _ -> failwith "must be 2 of same numerical type"
+      | _ -> failwith "Lt requires comparable types"
     )
   | Bop (And, e1, e2) -> (
       match go e1 with
       | VBool false -> VBool false
       | VBool true -> go e2
-      | _ -> failwith "Logical 'and' requires boolean operands"
-    )
-  | Bop (Or, e1, e2) -> (
-      match go e1 with
-      | VBool true -> VBool true
-      | VBool false -> go e2
-      | _ -> failwith "Logical 'or' requires boolean operands"
-    )
-  | Bop (Comma, e1, e2) -> VPair (go e1, go e2)
-  | Bop (Concat, e1, e2) -> (
-      match go e1, go e2 with
-      | VList lst1, VList lst2 -> VList (lst1 @ lst2)
-      | _ -> failwith "Both operands of Concat must be lists"
+      | _ -> failwith "And requires boolean operands"
     )
   | Bop (Cons, e1, e2) -> (
       match go e2 with
       | VList lst -> VList (go e1 :: lst)
-      | _ -> failwith "Expected a list on the right-hand side of Cons"
+      | _ -> failwith "Cons requires a list as the second operand"
+    )
+  | Bop (Concat, e1, e2) -> (
+      match go e1, go e2 with
+      | VList lst1, VList lst2 -> VList (lst1 @ lst2)
+      | _ -> failwith "Concat requires two lists"
     )
   | If (e1, e2, e3) -> (
       match go e1 with
       | VBool true -> go e2
       | VBool false -> go e3
-      | _ -> failwith "Condition in if-expression must be a boolean"
+      | _ -> failwith "Condition in If must be a boolean"
+    )
+  | Assert e -> (
+      match go e with
+      | VBool true -> VUnit
+      | VBool false -> raise AssertFail
+      | _ -> failwith "Assert requires a boolean expression"
     )
   | ESome e -> VSome (go e)
   | OptMatch { matched; some_name; some_case; none_case } -> (
       match go matched with
       | VSome v -> eval_expr (Env.add some_name v env) some_case
       | VNone -> eval_expr env none_case
-      | _ -> failwith "Expected an option"
+      | _ -> failwith "OptMatch requires an option"
     )
   | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } -> (
       match go matched with
-      | VList (vh :: vt) ->
-          let env = Env.add hd_name vh (Env.add tl_name (VList vt) env) in
+      | VList (hd :: tl) ->
+          let env = Env.add hd_name hd (Env.add tl_name (VList tl) env) in
           eval_expr env cons_case
       | VList [] -> eval_expr env nil_case
-      | _ -> failwith "Expected a list"
+      | _ -> failwith "ListMatch requires a list"
     )
   | PairMatch { matched; fst_name; snd_name; case } -> (
       match go matched with
       | VPair (v1, v2) ->
           let env = Env.add fst_name v1 (Env.add snd_name v2 env) in
           eval_expr env case
-      | _ -> failwith "Expected a pair"
+      | _ -> failwith "PairMatch requires a pair"
     )
   | Let { is_rec = false; name; value; body } ->
-      let v1 = go value in
-      eval_expr (Env.add name v1 env) body
+      let v = go value in
+      eval_expr (Env.add name v env) body
   | Let { is_rec = true; name = f; value = e1; body = e2 } -> (
-      match eval_expr env e1 with
+      match go e1 with
       | VClos { name = None; arg; body = closure_body; env = closure_env } ->
           let closure = VClos { name = Some f; arg; body = closure_body; env = closure_env } in
           eval_expr (Env.add f closure env) e2
-      | _ -> failwith "Expected a closure in recursive let binding"
+      | _ -> failwith "Let rec requires a function"
     )
   | Annot (e, _) -> go e
-  | Assert e1 -> (
-      match go e1 with
-      | VBool true -> VUnit
-      | VBool false -> raise AssertFail
-      | _ -> raise AssertFail
-    )
+  | _ -> failwith "Impossilbe"
   in
   go expr
 
