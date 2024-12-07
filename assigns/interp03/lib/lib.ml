@@ -105,20 +105,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
-        | Eq | Neq -> 
-            (match t1, t2 with
-            | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 ->
-                (TBool, c1 @ c2)
-            | TList _, TList _ ->
-                failwith "Lists must have elements of the same type to be compared"
-            | TUnit, TUnit 
-            | TInt, TInt 
-            | TFloat, TFloat 
-            | TBool, TBool 
-            | TPair (_, _), TPair (_, _) -> 
-                (TBool, c1 @ c2)
-            | _ -> failwith "Equality requires comparable types")
-        | Lt | Lte | Gt | Gte ->
+        | Eq | Neq | Lt | Lte | Gt | Gte ->
             let fresh = TVar (gensym ()) in
             (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
         | Cons ->
@@ -192,6 +179,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | Some t -> Some t 
     | None -> None
   with _ -> None
+
 
 
 
