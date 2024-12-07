@@ -146,6 +146,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         let env = Env.add name (Forall([], t_val)) env in  
         let t_body, c_body = infer env body in
         (t_body, c_val @ c_body)
+    | Assert False -> (TVar (gensym ()), [])
     | Assert e ->
       let t, c = infer env e in
       (TUnit, (t, TBool) :: c)
@@ -180,14 +181,10 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | None -> None
   with _ -> None
 
-
-
-
 exception AssertFail
 exception DivByZero
 exception RecWithoutArg
 exception CompareFunVals
-
 
 let rec eval_expr env expr : value = 
   let rec go = function
