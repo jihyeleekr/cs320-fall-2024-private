@@ -251,16 +251,6 @@ let rec eval_expr env expr : value =
       | VFloat m, VFloat n -> VBool (m >= n)
       | _ -> failwith "Gte requires two comparable values")
 
-  | Bop (Cons, e1, e2) -> (
-      match go e1, go e2 with
-      | v1, VList lst -> VList (v1 :: lst)
-      | _ -> failwith "Cons requires a list on the right-hand side")
-
-  | Bop (Concat, e1, e2) -> (
-      match go e1, go e2 with
-      | VList lst1, VList lst2 -> VList (lst1 @ lst2)
-      | _ -> failwith "Concat requires two lists")
-
   | Bop (And, e1, e2) -> (
       match go e1 with
       | VBool false -> VBool false
@@ -273,13 +263,25 @@ let rec eval_expr env expr : value =
       | VBool false -> go e2
       | _ -> failwith "Logical 'or' requires boolean operands")
 
+  | Bop (Cons, e1, e2) -> (
+      match go e1, go e2 with
+      | v1, VList lst -> VList (v1 :: lst)
+      | _ -> failwith "Cons requires a list on the right-hand side")
+
+  | Bop (Concat, e1, e2) -> (
+      match go e1, go e2 with
+      | VList lst1, VList lst2 -> VList (lst1 @ lst2)
+      | _ -> failwith "Concat requires two lists")
+
   | Bop (Comma, e1, e2) -> VPair (go e1, go e2)
 
-  | Assert e1 -> (
-      match go e1 with
-      | VBool true -> VUnit
-      | VBool false -> raise AssertFail
-      | _ -> failwith "Assert requires a boolean")
+  | ESome e -> VSome (go e)
+
+  | OptMatch { matched; some_name; some_case; none_case } -> (
+      match go matched with
+      | VSome v -> eval_expr (Env.add some_name v env) some_case
+      | VNone -> eval_expr env none_case
+      | _ -> failwith "Expected an option value")
 
   | If (e1, e2, e3) -> (
       match go e1 with
@@ -315,11 +317,18 @@ let rec eval_expr env expr : value =
           eval_expr env' case
       | _ -> failwith "PairMatch requires a pair")
 
+  | Assert e1 -> (
+      match go e1 with
+      | VBool true -> VUnit
+      | VBool false -> raise AssertFail
+      | _ -> failwith "Assert requires a boolean")
+
   | Annot (e, _) -> go e
 
   | _ -> failwith "Unhandled case in eval_expr"
   in
   go expr
+
 
 
 let type_check =
