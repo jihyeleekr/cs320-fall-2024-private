@@ -101,12 +101,10 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
       let t_none_case, c_none = infer env none_case in
       let constraints =
         (t_matched, TOption fresh_elem) ::
-        (t_some_case, t_none_case) ::
+        (t_some_case, t_none_case) :: 
         c_matched @ c_some @ c_none
       in
       (t_some_case, constraints)
-    
-  
     | Bop (op, e1, e2) -> (
         let t1, c1 = infer env e1 in
         let t2, c2 = infer env e2 in
@@ -392,85 +390,82 @@ let rec eval_expr env expr : value =
   | ESome e ->
     let v = eval_expr  env e in
     VSome v
-
-  | OptMatch {matched; some_name; some_case; none_case} ->
-      (match eval_expr env matched  with
-      | VSome v -> eval_expr  (Env.add some_name v env) some_case
-      | VNone -> eval_expr env none_case 
-      | _ -> failwith "Expected an option")
-
-
+  | OptMatch { matched; some_name; some_case; none_case } ->
+    (match eval_expr env matched with
+    | VSome v -> eval_expr (Env.add some_name v env) some_case
+    | VNone -> eval_expr env none_case
+    | _ -> failwith "Expected an option")
+    
   | If (e1, e2, e3) -> (
         match go e1 with
         | VBool true -> go e2
         | VBool false -> go e3
         | _ -> failwith ( "Condition in if-expression must be a boolean")
       )
+  | Bop (Comma, e1, e2) -> 
+      let v1 = go e1 in
+      let v2 = go e2 in
+      VPair (v1, v2)
 
-| Bop (Comma, e1, e2) -> 
+  | Bop (Cons, e1, e2) -> 
+      let v1 = go e1 in
+      let v2 = go e2 in
+      (match v2 with
+      | VList lst -> VList (v1 :: lst)
+      | _ -> failwith "Expected a list on the right-hand side of Cons")
+
+  | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } -> (
+      match go matched with
+      | VList (vh :: vt) ->
+          let env = Env.add hd_name vh env in
+          let env = Env.add tl_name (VList vt) env in
+          eval_expr env cons_case 
+      | VList [] -> eval_expr env nil_case 
+      | _ -> failwith "Expected a list"
+  )
+
+  | PairMatch { matched; fst_name; snd_name; case } -> (
+      match go matched with
+      | VPair (v1, v2) ->
+          let env = Env.add fst_name v1 env in
+          let env = Env.add snd_name v2 env in
+          eval_expr env case 
+      | _ -> failwith "Expected a pair"
+  ) 
+  | Bop (Concat, e1, e2) ->
     let v1 = go e1 in
     let v2 = go e2 in
-    VPair (v1, v2)
+    (match (v1, v2) with
+    | (VList lst1, VList lst2) -> VList (lst1 @ lst2)
+    | _ -> failwith "Both operands of Concat must be lists")     
 
-| Bop (Cons, e1, e2) -> 
-    let v1 = go e1 in
-    let v2 = go e2 in
-    (match v2 with
-    | VList lst -> VList (v1 :: lst)
-    | _ -> failwith "Expected a list on the right-hand side of Cons")
+  | Assert e1 ->
+      (match go e1 with
+      | (VBool true) -> VUnit
+      | (VBool false) -> raise AssertFail
+      | _ -> raise AssertFail)
 
-| ListMatch { matched; hd_name; tl_name; cons_case; nil_case } -> (
-    match go matched with
-    | VList (vh :: vt) ->
-        let env = Env.add hd_name vh env in
-        let env = Env.add tl_name (VList vt) env in
-        eval_expr env cons_case 
-    | VList [] -> eval_expr env nil_case 
-    | _ -> failwith "Expected a list"
-)
+  | Let { is_rec = false; name; value; body } ->
+      let v1 = go value in
+      let new_env = Env.add name v1 env in
+      eval_expr new_env body 
 
-| PairMatch { matched; fst_name; snd_name; case } -> (
-    match go matched with
-    | VPair (v1, v2) ->
-        let env = Env.add fst_name v1 env in
-        let env = Env.add snd_name v2 env in
-        eval_expr env case 
-    | _ -> failwith "Expected a pair"
-) 
-| Bop (Concat, e1, e2) ->
-  let v1 = go e1 in
-  let v2 = go e2 in
-  (match (v1, v2) with
-  | (VList lst1, VList lst2) -> VList (lst1 @ lst2)
-  | _ -> failwith "Both operands of Concat must be lists")     
+  | Let { is_rec = true; name = f; value = e1; body = e2 } ->
+        let closure = 
+          (match eval_expr env e1  with
+          | VClos { name = None; arg; body = closure_body; env = closure_env } ->
+              VClos { name = Some f; arg; body = closure_body; env = closure_env }
+          | VClos { name = Some _; _ } ->
+            raise RecWithoutArg
+          | _ -> failwith ( "Expected a closure in recursive let binding"))
+        in
+        let updated_env = Env.add f closure env in
+        eval_expr updated_env  e2 
+  | Annot (e, _) ->
+      eval_expr env e 
 
-| Assert e1 ->
-    (match go e1 with
-    | (VBool true) -> VUnit
-    | (VBool false) -> raise AssertFail
-    | _ -> raise AssertFail)
-
-| Let { is_rec = false; name; value; body } ->
-    let v1 = go value in
-    let new_env = Env.add name v1 env in
-    eval_expr new_env body 
-
-| Let { is_rec = true; name = f; value = e1; body = e2 } ->
-      let closure = 
-        (match eval_expr env e1  with
-        | VClos { name = None; arg; body = closure_body; env = closure_env } ->
-            VClos { name = Some f; arg; body = closure_body; env = closure_env }
-        | VClos { name = Some _; _ } ->
-          raise RecWithoutArg
-        | _ -> failwith ( "Expected a closure in recursive let binding"))
-      in
-      let updated_env = Env.add f closure env in
-      eval_expr updated_env  e2 
-| Annot (e, _) ->
-    eval_expr env e 
-
-in
-go expr
+  in
+  go expr
 
 let type_check =
   let rec go ctxt = function
