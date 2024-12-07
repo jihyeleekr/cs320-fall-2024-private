@@ -181,6 +181,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | None -> None
   with _ -> None
 
+
 exception AssertFail
 exception DivByZero
 exception RecWithoutArg
