@@ -217,6 +217,28 @@ let rec eval_expr env expr : value =
       | VInt m, VInt n -> VInt (m + n)
       | _ -> failwith "Add requires two integers")
 
+  | Bop (Sub, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m - n)
+      | _ -> failwith "Sub requires two integers")
+
+  | Bop (Mul, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m * n)
+      | _ -> failwith "Mul requires two integers")
+
+  | Bop (Div, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt _, VInt 0 -> raise DivByZero
+      | VInt m, VInt n -> VInt (m / n)
+      | _ -> failwith "Div requires two integers")
+
+  | Bop (Mod, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n when n <> 0 -> VInt (m mod n)
+      | VInt _, VInt 0 -> failwith "Division by zero in modulo operation"
+      | _ -> failwith "Modulo requires two integers")
+
   | Bop (Eq, e1, e2) -> (
       match go e1, go e2 with
       | VClos _, _ | _, VClos _ -> raise CompareFunVals
@@ -328,8 +350,6 @@ let rec eval_expr env expr : value =
   | _ -> failwith "Unhandled case in eval_expr"
   in
   go expr
-
-
 
 let type_check =
   let rec go ctxt = function
