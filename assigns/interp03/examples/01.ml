@@ -7,6 +7,12 @@
 
 (* let x: int = 3 *)
 (* let test : unit = assert (b) *)
-let _ =
+(* let _ =
   let u : unit = () in
-  assert (u = ()) 
+  assert (u = ())  *)
+
+  let _ =
+    let l = [] in
+    let l = [1;2;3] in
+    let l : bool list = true :: false :: true :: [] in
+    assert (l = true :: false :: true :: [])
