@@ -210,7 +210,7 @@ let rec eval_expr env expr : value =
           in
           let env = Env.add arg (go e2) env in
           eval_expr env body
-      | _ -> failwith "Application requires a function"
+      | _ -> failwith "Expected a function for application"
     )
   | Bop (Add, e1, e2) -> (
       match go e1, go e2 with
@@ -222,7 +222,6 @@ let rec eval_expr env expr : value =
       | VClos _, _ | _, VClos _ -> raise CompareFunVals
       | VInt m, VInt n -> VBool (m = n)
       | VFloat m, VFloat n -> VBool (m = n)
-      | VBool m, VBool n -> VBool (m = n)
       | _ -> failwith "Equality requires two comparable values"
     )
   | If (e1, e2, e3) -> (
@@ -276,8 +275,6 @@ let rec eval_expr env expr : value =
   | _ -> failwith "Unhandled expression"
   in
   go expr
-
-
 
 
 let type_check =
