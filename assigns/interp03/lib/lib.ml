@@ -42,6 +42,12 @@ let sort_uniq cmp lst =
   let instantiate (vars, ty) =
     let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
     apply_subst subst ty
+
+let free_vars_in_env env =
+  List.fold_left
+    (fun acc (_, Forall (_, t)) -> free_vars t @ acc)
+    [] (Env.to_list env)
+    
 (* Unify Function *)
 let rec unify ty constraints =
   match constraints with
@@ -89,12 +95,18 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | Nil -> (TList (TVar (gensym ())), [])
     | OptMatch { matched; some_name; some_case; none_case } ->
       let t_matched, c_matched = infer env matched in
-      let fresh = TVar (gensym ()) in
-      let env_some = Env.add some_name (Forall ([], fresh)) env in
-      let t_some_case, c_some = infer env_some some_case in
+      let fresh_elem = TVar (gensym ()) in
+      let env_with_some = Env.add some_name (Forall ([], fresh_elem)) env in
+      let t_some_case, c_some = infer env_with_some some_case in
       let t_none_case, c_none = infer env none_case in
-      let c = (t_matched, TOption fresh) :: (t_some_case, t_none_case) :: c_matched @ c_some @ c_none in
-      (t_some_case, c)
+      let constraints =
+        (t_matched, TOption fresh_elem) ::
+        (t_some_case, t_none_case) ::
+        c_matched @ c_some @ c_none
+      in
+      (t_some_case, constraints)
+    
+  
     | Bop (op, e1, e2) -> (
         let t1, c1 = infer env e1 in
         let t2, c2 = infer env e2 in
@@ -105,27 +117,27 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
-        | Eq | Neq -> (
-          match t1, t2 with
-          | TUnit, TUnit
-          | TInt, TInt
-          | TFloat, TFloat
-          | TBool, TBool -> (TBool, c1 @ c2)      
-          | TList t_elem1, TList t_elem2 -> 
-              if t_elem1 = t_elem2 then (TBool, c1 @ c2)
-              else failwith "Lists must have the same element type for comparison"      
-          | TPair (t1a, t1b), TPair (t2a, t2b) -> 
-              (TBool, (t1a, t2a) :: (t1b, t2b) :: c1 @ c2)      
-          | TOption t_elem1, TOption t_elem2 -> 
-              (TBool, (t_elem1, t_elem2) :: c1 @ c2)      
-          | _ -> failwith "Equality requires comparable types"
-      )
+        | Eq | Neq -> 
+          (match t1, t2 with
+          | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 ->
+              (TBool, c1 @ c2)
+          | _ -> 
+              let fresh = TVar (gensym ()) in
+              (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2))
         | Lt | Lte | Gt | Gte -> (
-            match t1, t2 with
-            | TInt, TInt
-            | TFloat, TFloat -> (TBool, c1 @ c2)
-            | _ -> failwith "Comparison requires numerical types"
-        )
+          match t1, t2 with
+          | TInt, TInt
+          | TFloat, TFloat -> (TBool, c1 @ c2)  
+          | TPair (t1a, t1b), TPair (t2a, t2b) ->
+              (TBool, (t1a, t2a) :: (t1b, t2b) :: c1 @ c2)
+          | TOption t_elem1, TOption t_elem2 when t_elem1 = t_elem2 ->
+              (TBool, c1 @ c2) 
+          | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 ->
+              (TBool, c1 @ c2)  
+          | TBool, TBool -> (TBool, c1 @ c2)  
+          | TUnit, TUnit -> (TBool, c1 @ c2)  
+          | _ -> failwith "Comparison requires compatible types"
+          )
         | Cons ->
           let t1, c1 = infer env e1 in
           let t2, c2 = infer env e2 in
@@ -146,28 +158,43 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         let t3, c3 = infer env e3 in
         (t2, (t1, TBool) :: (t2, t3) :: c1 @ c2 @ c3)
     | Fun (x, Some ty, body) ->
-        let env = Env.add x (Forall ([], ty)) env in 
+        let env = Env.add x (Forall ([], ty)) env in
         let t_body, c_body = infer env body in
         (TFun (ty, t_body), c_body)
-    | Fun (x, None, body) ->
-        let fresh = TVar (gensym ()) in
-        let env = Env.add x (Forall ([], fresh)) env in
-        let t_body, c_body = infer env body in
-        (TFun (fresh, t_body), c_body)
+    | Fun (arg, None, body) ->
+      let fresh_arg = TVar (gensym ()) in
+      let env = Env.add arg (Forall ([], fresh_arg)) env in
+      let t_body, c_body = infer env body in
+      (TFun (fresh_arg, t_body), c_body)   
     | App (e1, e2) ->
-        let t_fun, c_fun = infer env e1 in
-        let t_arg, c_arg = infer env e2 in
-        let fresh = TVar (gensym ()) in
-        (fresh, (t_fun, TFun (t_arg, fresh)) :: c_fun @ c_arg)
-    | Let { name; value; body; _} ->
-        let t_val, c_val = infer env value in
-        let env = Env.add name (Forall([], t_val)) env in  
-        let t_body, c_body = infer env body in
-        (t_body, c_val @ c_body)
+      let t_fun, c_fun = infer env e1 in
+      let t_arg, c_arg = infer env e2 in
+      let fresh = TVar (gensym ()) in
+      let constraints = (t_fun, TFun (t_arg, fresh)) :: c_fun @ c_arg in
+      (fresh, constraints)
+    | Let { is_rec = false; name; value; body } ->
+      let t_val, c_val = infer env value in
+      let env = Env.add name (Forall ([], t_val)) env in
+      let t_body, c_body = infer env body in
+      (t_body, c_val @ c_body)
+    | Let { is_rec = true; name; value; body } ->
+      let fresh = TVar (gensym ()) in
+      let env_with_fresh = Env.add name (Forall ([], fresh)) env in
+      let t_val, c_val = infer env_with_fresh value in
+      let env_free_vars = free_vars_in_env env in
+      let generalized_type =
+        Forall (
+          List.filter (fun v -> not (List.mem v env_free_vars)) (free_vars t_val),
+          t_val
+        )
+      in
+      let env = Env.add name generalized_type env in
+      let t_body, c_body = infer env body in
+      (t_body, c_val @ c_body)
     | Assert False -> (TVar (gensym ()), [])
     | Assert e ->
       let t, c = infer env e in
-      (TUnit, (t, TBool) :: c)
+      (TUnit, (t, TBool) :: c)  
     | Annot (e, ty) ->
         let t, c = infer env e in
         (ty, (t, ty) :: c)
@@ -179,17 +206,19 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
       let t_case, c_case = infer extended_env case in
       (t_case, (t_matched, TPair (fresh1, fresh2)) :: c_matched @ c_case)
     | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } ->
-        let t_matched, c_matched = infer env matched in
-        let fresh = TVar (gensym ()) in
-        let extended_env = 
-          Env.add hd_name (Forall ([], fresh)) 
-            (Env.add tl_name (Forall ([], TList fresh)) env)
-        in
-        let t_cons_case, c_cons_case = infer extended_env cons_case in
-        let t_nil_case, c_nil_case = infer env nil_case in
-        (t_nil_case, 
-          (t_matched, TList fresh) :: (t_cons_case, t_nil_case) :: 
-          c_matched @ c_cons_case @ c_nil_case)
+      let t_matched, c_matched = infer env matched in
+      let fresh_elem = TVar (gensym ()) in
+      let env_hd = Env.add hd_name (Forall ([], fresh_elem)) env in
+      let env_tl = Env.add tl_name (Forall ([], TList fresh_elem)) env_hd in
+      let t_cons_case, c_cons_case = infer env_tl cons_case in
+      let t_nil_case, c_nil_case = infer env nil_case in
+      let constraints =
+        (t_matched, TList fresh_elem)
+        :: (t_cons_case, t_nil_case)
+        :: c_matched @ c_cons_case @ c_nil_case
+      in
+      (t_nil_case, constraints)
+      
   in
   try
     let t, c = infer env e in
@@ -290,8 +319,8 @@ let rec eval_expr env expr : value =
         | VFloat m, VFloat n -> VFloat (m**n)
         | _ -> failwith "impossible")
 
-  | Bop (Eq, e1, e2) ->
-    (match go e1, go e2 with
+  | Bop (Eq, e1, e2) -> (
+    match go e1, go e2 with
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
     | VInt m, VInt n -> VBool (m = n)
     | VFloat m, VFloat n -> VBool (m = n)
@@ -303,47 +332,65 @@ let rec eval_expr env expr : value =
     | VNone, VNone -> VBool true
     | _ -> VBool false)
       
-
-  | Bop (Neq, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<>n)
-    | VInt m, VInt n  -> VBool(m<>n)
-    | _ -> failwith "must be 2 of same numerical type")
-  
-  | Bop (Lt, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<n)
-    | VInt m, VInt n  -> VBool(m<n)
-    | _ -> failwith "must be 2 of same numerical type")
-  
-  | Bop (Lte, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<=n)
-    | VInt m, VInt n  -> VBool(m<=n)
-    | _ -> failwith "must be 2 of same numerical type")
-
-  | Bop (Gt, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m>n)
-    | VInt m, VInt n  -> VBool(m>n)
-    | _ -> failwith "must be 2 of same numerical type")
-
-  | Bop (Gte, e1, e2)  -> 
-    (match go e1, go e2 with 
-    | VClos { name = _; arg = _; body = _; env = _ }, _ | _, VClos { name = _; arg = _; body = _; env = _ } -> 
-      raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m>=n)
-    | VInt m, VInt n  -> VBool(m>=n)
-    | _ -> failwith "must be 2 of same numerical type")
-
+  | Bop (Neq, e1, e2) -> (
+      match go e1, go e2 with
+      | VClos _, _ | _, VClos _ -> raise CompareFunVals
+      | VInt m, VInt n -> VBool (m <> n)
+      | VFloat m, VFloat n -> VBool (m <> n)
+      | VBool m, VBool n -> VBool (m <> n)
+      | VUnit, VUnit -> VBool false
+      | VList lst1, VList lst2 -> VBool (lst1 <> lst2)
+      | VPair (v1a, v1b), VPair (v2a, v2b) -> VBool (v1a <> v2a || v1b <> v2b)
+      | VSome v1, VSome v2 -> VBool (v1 <> v2)
+      | VNone, VNone -> VBool false
+      | _ -> VBool true)
+  | Bop (Lt, e1, e2) -> (
+    match go e1, go e2 with
+    | VInt m, VInt n -> VBool (m < n)                     
+    | VFloat m, VFloat n -> VBool (m < n)                 
+    | VBool m, VBool n -> VBool ((not m) && n)            
+    | VList lst1, VList lst2 -> VBool (lst1 < lst2)       
+    | VSome v1, VSome v2 -> VBool (v1 < v2)               
+    | VNone, VSome _ -> VBool true                        
+    | VNone, VNone -> VBool false                         
+    | _ -> failwith "Lt requires comparable types"
+    )
+    
+  | Bop (Lte, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m <= n)                    
+      | VFloat m, VFloat n -> VBool (m <= n)                
+      | VBool m, VBool n -> VBool ((not n) || m)            
+      | VList lst1, VList lst2 -> VBool (lst1 <= lst2)      
+      | VSome v1, VSome v2 -> VBool (v1 <= v2)              
+      | VNone, VSome _ -> VBool true                        
+      | VNone, VNone -> VBool true                          
+      | _ -> failwith "Lte requires comparable types"
+  )
+  | Bop (Gt, e1, e2) -> (
+    match go e1, go e2 with
+    | VInt m, VInt n -> VBool (m > n)
+    | VFloat m, VFloat n -> VBool (m > n)
+    | VBool m, VBool n -> VBool (m && not n)  
+    | VPair (v1a, v1b), VPair (v2a, v2b) -> VBool ((v1a, v1b) > (v2a, v2b)) 
+    | VSome v1, VSome v2 -> VBool (v1 > v2)
+    | VNone, VSome _ -> VBool false
+    | VNone, VNone -> VBool false
+    | VList lst1, VList lst2 -> VBool (lst1 > lst2) 
+    | _ -> failwith "Gt requires comparable types"
+  )
+  | Bop (Gte, e1, e2) -> (
+    match go e1, go e2 with
+    | VInt m, VInt n -> VBool (m >= n)                    
+    | VFloat m, VFloat n -> VBool (m >= n)                
+    | VBool m, VBool n -> VBool (m || not n)            
+    | VList lst1, VList lst2 -> VBool (lst1 >= lst2)      
+    | VSome v1, VSome v2 -> VBool (v1 >= v2)              
+    | VSome _, VNone -> VBool true                        
+    | VNone, VNone -> VBool true
+    | VUnit, VUnit -> VBool true  
+    | _ -> failwith "Gte requires comparable types"
+)
   | Bop (And, e1, e2) -> (
       match go e1 with
       | VBool false -> VBool false
