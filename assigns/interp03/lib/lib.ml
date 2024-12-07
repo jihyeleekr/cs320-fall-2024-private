@@ -48,71 +48,33 @@ let free_vars_in_env env =
     (fun acc (_, Forall (_, t)) -> free_vars t @ acc)
     [] (Env.to_list env)
 
-    (* let rec string_of_ty = function
-    | TUnit -> "unit"
-    | TInt -> "int"
-    | TFloat -> "float"
-    | TBool -> "bool"
-    | TVar x -> "'" ^ x
-    | TList t -> string_of_ty t ^ " list"
-    | TOption t -> string_of_ty t ^ " option"
-    | TPair (t1, t2) -> "(" ^ string_of_ty t1 ^ " * " ^ string_of_ty t2 ^ ")"
-    | TFun (t1, t2) -> "(" ^ string_of_ty t1 ^ " -> " ^ string_of_ty t2 ^ ")" *)
-  
-    (* Converts a single constraint to a string *)
-(* let string_of_constraint (t1, t2) =
-  string_of_ty t1 ^ " = " ^ string_of_ty t2 *)
-
-(* Converts a list of constraints to a string *)
-(* let string_of_constraints constraints =
-  String.concat ", " (List.map string_of_constraint constraints)
-
-    let print_constraints constraints =
-      print_endline ("Constraints: " ^ string_of_constraints constraints) *)
 (* Unify Function *)
 let rec unify ty constraints =
   match constraints with
   | [] -> 
     let free = sort_uniq compare (free_vars ty) in
-    (* print_endline ("Unification successful: " ^ string_of_ty ty); *)
     Some (Forall (free, ty)) 
-  | (t1, t2) :: rest when t1 = t2 -> 
-    (* print_endline ("Skipping identical types: " ^ string_of_ty t1 ^ " = " ^ string_of_ty t2); *)
-    unify ty rest 
+  | (t1, t2) :: rest when t1 = t2 -> unify ty rest 
   | (TVar x, t) :: rest | (t, TVar x) :: rest ->
-    if occurs x t then (
-      (* print_endline ("Occurs check failed: " ^ x ^ " in " ^ string_of_ty t); *)
-      None
-    ) else (
+    if occurs x t then None 
+    else
       let subst = [(x, t)] in
-      (* print_endline ("Substituting: " ^ x ^ " -> " ^ string_of_ty t); *)
       let unified_ty = apply_subst subst ty in
       let unified_constraints = apply_subst_to_constraints subst rest in
-      unify unified_ty unified_constraints
-    )
+      (match unify unified_ty unified_constraints with
+       | Some (Forall (vars, final_ty)) ->
+         let new_vars = List.filter (fun v -> v <> x) vars in
+         Some (Forall (new_vars, final_ty))
+       | None -> None)
   | (TFun (t1a, t1b), TFun (t2a, t2b)) :: rest ->
-    (* print_endline ("Unifying function types: " ^ string_of_ty t1a ^ " -> " ^ string_of_ty t1b ^ 
-                   " = " ^ string_of_ty t2a ^ " -> " ^ string_of_ty t2b); *)
     unify ty ((t1a, t2a) :: (t1b, t2b) :: rest)
   | (TPair (t1a, t1b), TPair (t2a, t2b)) :: rest ->
-    (* print_endline ("Unifying pair types: " ^ string_of_ty t1a ^ " * " ^ string_of_ty t1b ^ 
-                   " = " ^ string_of_ty t2a ^ " * " ^ string_of_ty t2b); *)
     unify ty ((t1a, t2a) :: (t1b, t2b) :: rest)
-  | (TList t1, TList t2) :: rest ->
-    (* print_endline ("Unifying list types: " ^ string_of_ty t1 ^ " list = " ^ string_of_ty t2 ^ " list"); *)
+  | (TList t1, TList t2) :: rest | (TOption t1, TOption t2) :: rest ->
     unify ty ((t1, t2) :: rest)
-  | (TOption t1, TOption t2) :: rest ->
-    (* print_endline ("Unifying option types: " ^ string_of_ty t1 ^ " option = " ^ string_of_ty t2 ^ " option"); *)
-    unify ty ((t1, t2) :: rest)
-  | (TInt, TFloat) :: _ | (TFloat, TInt) :: _ ->
-    (* print_endline ("Incompatible base types: int vs float"); *)
-    None
-  | (TBool, TInt) :: _ | (TBool, TFloat) :: _ ->
-    (* print_endline ("Incompatible base types: bool vs int/float"); *)
-    None
-  | (_, _) :: _ ->
-    (* print_endline ("Unhandled types: " ^ string_of_ty t1 ^ " vs " ^ string_of_ty t2); *)
-    None
+  | (TInt, TFloat) :: _ | (TFloat, TInt) :: _ -> None 
+  | (TBool, TInt) :: _ | (TBool, TFloat) :: _ -> None 
+  | _ -> None 
 
 
 (* type_of Function *)
@@ -141,7 +103,6 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         let t_fun, c_fun = infer env e1 in
         let t_arg, c_arg = infer env e2 in
         let fresh = TVar (gensym ()) in
-        (* print_endline ("App: t_fun = " ^ string_of_ty t_fun ^ ", t_arg = " ^ string_of_ty t_arg ^ ", fresh = " ^ string_of_ty fresh); *)
         let constraints = (t_fun, TFun (t_arg, fresh)) :: c_fun @ c_arg in
         (fresh, constraints)
     | Fun (arg, None, body) ->
@@ -181,26 +142,12 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
-            | Eq | Neq -> 
-              (match t1, t2 with
-              | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 ->
-                  (TBool, c1 @ c2)
-              | _ -> 
-                  let fresh = TVar (gensym ()) in
-                  (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2))
-            | Lt | Lte | Gt | Gte -> (
-              match t1, t2 with
-              | TInt, TInt
-              | TFloat, TFloat -> (TBool, c1 @ c2)  
-              | TPair (t1a, t1b), TPair (t2a, t2b) ->
-                  (TBool, (t1a, t2a) :: (t1b, t2b) :: c1 @ c2)
-              | TOption t_elem1, TOption t_elem2 when t_elem1 = t_elem2 ->
-                  (TBool, c1 @ c2) 
-              | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 ->
-                  (TBool, c1 @ c2)  
-              | TBool, TBool -> (TBool, c1 @ c2)  
-              | TUnit, TUnit -> (TBool, c1 @ c2)  
-              | _ -> failwith "Comparison requires compatible types")
+        | Eq | Neq ->
+            let fresh = TVar (gensym ()) in
+            (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
+        | Lt | Lte | Gt | Gte ->
+            let fresh = TVar (gensym ()) in
+            (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
         | Cons ->
             let t1, c1 = infer env e1 in
             let t2, c2 = infer env e2 in
@@ -249,10 +196,8 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
   in
   try
     let t, c = infer env e in
-    let t = unify t c in
-    match t with
-    | Some t -> Some t 
-    | None -> None
+    (* print_constraints c; *)
+    unify t c
   with _ -> None
 
 
