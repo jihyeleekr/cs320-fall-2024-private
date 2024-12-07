@@ -142,12 +142,27 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
-        | Eq | Neq ->
-            let fresh = TVar (gensym ()) in
-            (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
-        | Lt | Lte | Gt | Gte ->
-            let fresh = TVar (gensym ()) in
-            (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
+        | Eq | Neq -> 
+          (match t1, t2 with
+          | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 ->
+              (TBool, c1 @ c2)
+          | _ -> 
+              let fresh = TVar (gensym ()) in
+              (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2))
+        | Lt | Lte | Gt | Gte -> (
+          match t1, t2 with
+          | TInt, TInt
+          | TFloat, TFloat -> (TBool, c1 @ c2)  
+          | TPair (t1a, t1b), TPair (t2a, t2b) ->
+              (TBool, (t1a, t2a) :: (t1b, t2b) :: c1 @ c2)
+          | TOption t_elem1, TOption t_elem2 when t_elem1 = t_elem2 ->
+              (TBool, c1 @ c2) 
+          | TList t_elem1, TList t_elem2 when t_elem1 = t_elem2 ->
+              (TBool, c1 @ c2)  
+          | TBool, TBool -> (TBool, c1 @ c2)  
+          | TUnit, TUnit -> (TBool, c1 @ c2)  
+          | _ -> failwith "Comparison requires compatible types"
+          )
         | Cons ->
             let t1, c1 = infer env e1 in
             let t2, c2 = infer env e2 in
