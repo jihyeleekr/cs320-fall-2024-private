@@ -188,52 +188,82 @@ exception RecWithoutArg
 exception CompareFunVals
 
 
-let rec eval_expr env expr : value =
+let rec eval_expr env expr : value = 
   let rec go = function
-  | Unit -> VUnit
-  | True -> VBool true
-  | False -> VBool false
+  | Unit -> VUnit 
+  | True -> VBool true 
+  | False -> VBool false 
   | Int n -> VInt n
   | Float f -> VFloat f
   | ENone -> VNone
   | Nil -> VList []
   | Var x -> (
-      try Env.find x env
-      with Not_found -> failwith ("Unbound variable: " ^ x))
-  | Fun (x, _, body) -> VClos { name = None; arg = x; body; env }
+        Env.find x env)
+  | Fun (x, _, body) -> VClos {name=None; arg = x; body; env}
 
   | App (e1, e2) -> (
-      match go e1 with
-      | VClos { env = clos_env; name; arg; body } ->
-          let env' =
+        match go e1 with
+        | VClos { env; name; arg; body } ->
+          let env =
             match name with
-            | None -> clos_env
-            | Some name -> Env.add name (VClos { env = clos_env; name = Some name; arg; body }) clos_env
+            | None -> env
+            | Some name -> Env.add name (VClos { env; name = Some name; arg; body }) env
           in
-          let env' = Env.add arg (go e2) env' in
-          eval_expr env' body
-      | _ -> failwith "Application requires a function")
+          let env = Env.add arg (go e2) env in
+          eval_expr env body
+        | _ -> failwith "Application requires a function")
 
-  | Bop (Add, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m + n)
-      | _ -> failwith "Add requires two integers")
+  | Bop (Add, e1, e2) -> 
+      (match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m+n)
+      | _ -> failwith "Addition requires two integers")
 
-  | Bop (Sub, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m - n)
-      | _ -> failwith "Sub requires two integers")
+  | Bop (AddF, e1, e2) -> 
+        (match go e1, go e2 with
+        | VFloat m, VFloat n -> VFloat (m+.n)
+        | _ -> failwith "Addition requires two floats")
 
-  | Bop (Mul, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m * n)
-      | _ -> failwith "Mul requires two integers")
+  | Bop (Sub, e1, e2) -> 
+      (match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m-n)
+      | _ -> failwith "Subtraction requires two integers")
+
+  | Bop (SubF, e1, e2) -> 
+      (match go e1, go e2 with
+      | VFloat m, VFloat n -> VFloat (m-.n)
+      | _ -> failwith "Subtraction requires two floats")
+
+  | Bop (Mul, e1, e2) -> 
+      (match go e1, go e2 with
+      | VInt m, VInt n -> VInt (m*n)
+      | _ -> failwith "Multiplication requires two integers")
+
+  | Bop (MulF, e1, e2) -> 
+        (match go e1, go e2 with
+        | VFloat m, VFloat n -> VFloat (m*.n)
+        | _ -> failwith "Multiplication requires two floats")
 
   | Bop (Div, e1, e2) -> (
       match go e1, go e2 with
+      | VInt m, VInt n when n <> 0 -> VInt (m / n)
       | VInt _, VInt 0 -> raise DivByZero
-      | VInt m, VInt n -> VInt (m / n)
-      | _ -> failwith "Div requires two integers")
+      | _ -> failwith "Division requires two integers")
+
+  | Bop (DivF, e1, e2) -> (
+      match go e1, go e2 with
+      | VFloat m, VFloat n -> VFloat (m /. n)
+      | _ -> failwith "Division requires two floats")
+
+  | Bop (Mod, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n when n <> 0 -> VInt (m mod n)
+      | VInt _, VInt 0 -> failwith "Division by zero in modulo operation"
+      | _ -> failwith "Modulo operation requires two integers")
+
+  | Bop (PowF, e1, e2) -> (
+      match go e1, go e2 with
+      | VFloat m, VFloat n -> VFloat (m ** n)
+      | _ -> failwith "Exponentiation requires two floats")
 
   | Bop (Eq, e1, e2) -> (
       match go e1, go e2 with
@@ -244,6 +274,56 @@ let rec eval_expr env expr : value =
       match go e1, go e2 with
       | VClos _, _ | _, VClos _ -> raise CompareFunVals
       | v1, v2 -> VBool (v1 <> v2))
+
+  | Bop (Lt, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m < n)
+      | VFloat m, VFloat n -> VBool (m < n)
+      | _ -> failwith "Less-than requires two comparable values")
+
+  | Bop (Lte, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m <= n)
+      | VFloat m, VFloat n -> VBool (m <= n)
+      | _ -> failwith "Less-than-or-equal requires two comparable values")
+
+  | Bop (Gt, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m > n)
+      | VFloat m, VFloat n -> VBool (m > n)
+      | _ -> failwith "Greater-than requires two comparable values")
+
+  | Bop (Gte, e1, e2) -> (
+      match go e1, go e2 with
+      | VInt m, VInt n -> VBool (m >= n)
+      | VFloat m, VFloat n -> VBool (m >= n)
+      | _ -> failwith "Greater-than-or-equal requires two comparable values")
+
+  | Bop (And, e1, e2) -> (
+      match go e1 with
+      | VBool false -> VBool false
+      | VBool true -> go e2
+      | _ -> failwith "Logical 'and' requires boolean operands")
+
+  | Bop (Or, e1, e2) -> (
+      match go e1 with
+      | VBool true -> VBool true
+      | VBool false -> go e2
+      | _ -> failwith "Logical 'or' requires boolean operands")
+
+  | Bop (Comma, e1, e2) -> VPair (go e1, go e2)
+
+  | Bop (Cons, e1, e2) -> (
+      match go e1, go e2 with
+      | v1, VList lst -> VList (v1 :: lst)
+      | _ -> failwith "Cons requires a list on the right-hand side")
+
+  | Bop (Concat, e1, e2) -> (
+      match go e1, go e2 with
+      | VList lst1, VList lst2 -> VList (lst1 @ lst2)
+      | _ -> failwith "Concat requires two lists")
+
+  | ESome e -> VSome (go e)
 
   | OptMatch { matched; some_name; some_case; none_case } -> (
       match go matched with
@@ -257,14 +337,20 @@ let rec eval_expr env expr : value =
           let env' = Env.add hd_name vh (Env.add tl_name (VList vt) env) in
           eval_expr env' cons_case
       | VList [] -> eval_expr env nil_case
-      | _ -> failwith "ListMatch requires a list")
+      | _ -> failwith "Expected a list")
 
   | PairMatch { matched; fst_name; snd_name; case } -> (
       match go matched with
       | VPair (v1, v2) ->
           let env' = Env.add fst_name v1 (Env.add snd_name v2 env) in
           eval_expr env' case
-      | _ -> failwith "PairMatch requires a pair")
+      | _ -> failwith "Expected a pair")
+
+  | If (e1, e2, e3) -> (
+      match go e1 with
+      | VBool true -> go e2
+      | VBool false -> go e3
+      | _ -> failwith "Condition in if-expression must be a boolean")
 
   | Assert e1 -> (
       match go e1 with
@@ -272,11 +358,23 @@ let rec eval_expr env expr : value =
       | VBool false -> raise AssertFail
       | _ -> failwith "Assert requires a boolean")
 
-  | Annot (e, _) -> go e
+  | Let { is_rec = false; name; value; body } ->
+      let v1 = go value in
+      let env' = Env.add name v1 env in
+      eval_expr env' body
 
-  | _ -> failwith "Unhandled case in eval_expr"
+  | Let { is_rec = true; name = f; value = e1; body = e2 } -> (
+      match go e1 with
+      | VClos { name = None; arg; body = closure_body; env = closure_env } ->
+          let closure = VClos { name = Some f; arg; body = closure_body; env = closure_env } in
+          let env' = Env.add f closure env in
+          eval_expr env' e2
+      | _ -> raise RecWithoutArg)
+
+  | Annot (e, _) -> go e
   in
   go expr
+
 
 
 let type_check =
