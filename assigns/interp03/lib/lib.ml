@@ -198,82 +198,38 @@ let rec eval_expr env expr : value =
   | ENone -> VNone
   | Nil -> VList []
   | Var x -> (
-        Env.find x env)
+      try Env.find x env
+      with Not_found -> failwith ("Unbound variable: " ^ x))
   | Fun (x, _, body) -> VClos {name=None; arg = x; body; env}
 
   | App (e1, e2) -> (
-        match go e1 with
-        | VClos { env; name; arg; body } ->
-          let env =
+      match go e1 with
+      | VClos { env; name; arg; body } ->
+          let env' =
             match name with
             | None -> env
             | Some name -> Env.add name (VClos { env; name = Some name; arg; body }) env
           in
-          let env = Env.add arg (go e2) env in
-          eval_expr env body
-        | _ -> failwith "Application requires a function")
+          let env' = Env.add arg (go e2) env' in
+          eval_expr env' body
+      | _ -> failwith "Application requires a function")
 
   | Bop (Add, e1, e2) -> 
       (match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m+n)
+      | VInt m, VInt n -> VInt (m + n)
       | _ -> failwith "Addition requires two integers")
 
-  | Bop (AddF, e1, e2) -> 
-        (match go e1, go e2 with
-        | VFloat m, VFloat n -> VFloat (m+.n)
-        | _ -> failwith "Addition requires two floats")
-
-  | Bop (Sub, e1, e2) -> 
-      (match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m-n)
-      | _ -> failwith "Subtraction requires two integers")
-
-  | Bop (SubF, e1, e2) -> 
-      (match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m-.n)
-      | _ -> failwith "Subtraction requires two floats")
-
-  | Bop (Mul, e1, e2) -> 
-      (match go e1, go e2 with
-      | VInt m, VInt n -> VInt (m*n)
-      | _ -> failwith "Multiplication requires two integers")
-
-  | Bop (MulF, e1, e2) -> 
-        (match go e1, go e2 with
-        | VFloat m, VFloat n -> VFloat (m*.n)
-        | _ -> failwith "Multiplication requires two floats")
-
-  | Bop (Div, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n when n <> 0 -> VInt (m / n)
-      | VInt _, VInt 0 -> raise DivByZero
-      | _ -> failwith "Division requires two integers")
-
-  | Bop (DivF, e1, e2) -> (
-      match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m /. n)
-      | _ -> failwith "Division requires two floats")
-
-  | Bop (Mod, e1, e2) -> (
-      match go e1, go e2 with
-      | VInt m, VInt n when n <> 0 -> VInt (m mod n)
-      | VInt _, VInt 0 -> failwith "Division by zero in modulo operation"
-      | _ -> failwith "Modulo operation requires two integers")
-
-  | Bop (PowF, e1, e2) -> (
-      match go e1, go e2 with
-      | VFloat m, VFloat n -> VFloat (m ** n)
-      | _ -> failwith "Exponentiation requires two floats")
-
-  | Bop (Eq, e1, e2) -> (
-      match go e1, go e2 with
+  | Bop (Eq, e1, e2) -> 
+      let v1, v2 = go e1, go e2 in
+      (match v1, v2 with
       | VClos _, _ | _, VClos _ -> raise CompareFunVals
-      | v1, v2 -> VBool (v1 = v2))
+      | _ -> VBool (v1 = v2))
 
-  | Bop (Neq, e1, e2) -> (
-      match go e1, go e2 with
+  | Bop (Neq, e1, e2) -> 
+      let v1, v2 = go e1, go e2 in
+      (match v1, v2 with
       | VClos _, _ | _, VClos _ -> raise CompareFunVals
-      | v1, v2 -> VBool (v1 <> v2))
+      | _ -> VBool (v1 <> v2))
 
   | Bop (Lt, e1, e2) -> (
       match go e1, go e2 with
@@ -372,8 +328,10 @@ let rec eval_expr env expr : value =
       | _ -> raise RecWithoutArg)
 
   | Annot (e, _) -> go e
+  | _ -> failwith"Impossible"
   in
   go expr
+
 
 
 
