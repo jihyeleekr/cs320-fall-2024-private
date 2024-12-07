@@ -173,7 +173,10 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         (t_nil_case, 
           (t_matched, TList fresh) :: (t_cons_case, t_nil_case) :: 
           c_matched @ c_cons_case @ c_nil_case)
-    | _ -> failwith "Expression not supported"
+    | Assert e ->
+        let t, c = infer env e in
+        (TUnit, (t, TBool) :: c)
+    | Annot (_, ty) -> (ty, [])
   in
   try
     let t, c = infer env e in
@@ -181,6 +184,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | Some (Forall (vars, ty)) -> Some (Forall (vars, ty))
     | None -> None
   with _ -> None
+ 
 
 
 exception AssertFail
