@@ -39,19 +39,6 @@ let sort_uniq cmp lst =
   in
   uniq [] sorted
 
-  (* let rec string_of_ty = function
-  | TUnit -> "TUnit"
-  | TInt -> "TInt"
-  | TFloat -> "TFloat"
-  | TBool -> "TBool"
-  | TVar x -> "TVar(" ^ x ^ ")"
-  | TList t -> "TList(" ^ string_of_ty t ^ ")"
-  | TOption t -> "TOption(" ^ string_of_ty t ^ ")"
-  | TPair (t1, t2) -> "TPair(" ^ string_of_ty t1 ^ ", " ^ string_of_ty t2 ^ ")"
-  | TFun (t1, t2) -> "TFun(" ^ string_of_ty t1 ^ " -> " ^ string_of_ty t2 ^ ")" *)
-
-(* let string_of_constraints constraints =
-  "[" ^ String.concat "; " (List.map (fun (t1, t2) -> string_of_ty t1 ^ " = " ^ string_of_ty t2) constraints) ^ "]" *)
   let instantiate (vars, ty) =
     let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
     apply_subst subst ty
@@ -118,11 +105,9 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
-        | Eq | Neq ->
-          (TBool, (t1, t2) :: c1 @ c2)
-        | Lt | Lte | Gt | Gte ->
-          let fresh = TVar (gensym ()) in
-          (TBool, (t1, fresh) :: (t2, fresh) :: (fresh, TInt) :: c1 @ c2)          
+        | Eq | Neq | Lt | Lte | Gt | Gte ->
+            let fresh = TVar (gensym ()) in
+            (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
         | Cons ->
           let fresh = TVar (gensym ()) in
           (TList fresh, (t1, fresh) :: (t2, TList fresh) :: c1 @ c2)
