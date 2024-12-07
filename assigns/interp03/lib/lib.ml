@@ -151,7 +151,12 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         (fresh, (t_fun, TFun (t_arg, fresh)) :: c_fun @ c_arg)
     | Let { name; value; body; _} ->
         let t_val, c_val = infer env value in
-        let env = Env.add name (Forall([], t_val)) env in  
+        let free_in_env =
+          List.concat (List.map (fun (_, Forall (_, t)) -> free_vars t) (Env.to_list env)) in
+        let free_in_t_val = free_vars t_val in
+        let generalized = List.filter (fun v -> not (List.mem v free_in_env)) free_in_t_val in
+        let generalized_ty = Forall (generalized, t_val) in
+        let env = Env.add name generalized_ty env in
         let t_body, c_body = infer env body in
         (t_body, c_val @ c_body)
     | PairMatch { matched; fst_name; snd_name; case } ->
@@ -176,7 +181,9 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | Assert e ->
         let t, c = infer env e in
         (TUnit, (t, TBool) :: c)
-    | Annot (_, ty) -> (ty, [])
+    | Annot (e, ty) ->
+        let t, c = infer env e in
+        (ty, (t, ty) :: c)
   in
   try
     let t, c = infer env e in
@@ -184,7 +191,6 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | Some (Forall (vars, ty)) -> Some (Forall (vars, ty))
     | None -> None
   with _ -> None
- 
 
 
 exception AssertFail
