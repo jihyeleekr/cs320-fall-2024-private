@@ -119,10 +119,10 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
         | Eq | Neq ->
-          let fresh = TVar (gensym ()) in
-          (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
+          (TBool, (t1, t2) :: c1 @ c2)
         | Lt | Lte | Gt | Gte ->
-            (TBool, (t1, t2) :: (t1, TInt) :: (t2, TInt) :: c1 @ c2)
+          let fresh = TVar (gensym ()) in
+          (TBool, (t1, fresh) :: (t2, fresh) :: (fresh, TInt) :: c1 @ c2)          
         | Cons ->
           let fresh = TVar (gensym ()) in
           (TList fresh, (t1, fresh) :: (t2, TList fresh) :: c1 @ c2)
