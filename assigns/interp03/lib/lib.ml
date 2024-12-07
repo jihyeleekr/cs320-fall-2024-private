@@ -195,10 +195,7 @@ let rec eval_expr env expr : value =
   | Float f -> VFloat f
   | ENone -> VNone
   | Nil -> VList []
-  | Var x -> (
-      try Env.find x env
-      with Not_found -> failwith ("Undefined variable: " ^ x)
-    )
+  | Var x -> Env.find x env
   | Fun (x, _, body) -> VClos { name = None; arg = x; body; env }
   | App (e1, e2) -> (
       match go e1 with
@@ -210,19 +207,12 @@ let rec eval_expr env expr : value =
           in
           let env = Env.add arg (go e2) env in
           eval_expr env body
-      | _ -> failwith "Expected a function for application"
+      | _ -> failwith "Application requires a function"
     )
   | Bop (Add, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n -> VInt (m + n)
       | _ -> failwith "Add requires two integers"
-    )
-  | Bop (Eq, e1, e2) -> (
-      match go e1, go e2 with
-      | VClos _, _ | _, VClos _ -> raise CompareFunVals
-      | VInt m, VInt n -> VBool (m = n)
-      | VFloat m, VFloat n -> VBool (m = n)
-      | _ -> failwith "Equality requires two comparable values"
     )
   | If (e1, e2, e3) -> (
       match go e1 with
@@ -275,6 +265,7 @@ let rec eval_expr env expr : value =
   | _ -> failwith "Unhandled expression"
   in
   go expr
+
 
 
 let type_check =
