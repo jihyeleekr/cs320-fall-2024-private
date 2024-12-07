@@ -270,45 +270,39 @@ let rec eval_expr env expr : value =
   | Bop (Eq, e1, e2)  -> 
     (match go e1, go e2 with 
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m=n)
-    | VInt m, VInt n  -> VBool(m=n)
-    | VBool m, VBool n -> VBool(m=n)
-    | _ -> failwith "Equality requires two comparable values")
+    | v1, v2 -> VBool (v1 = v2))
 
   | Bop (Neq, e1, e2)  -> 
     (match go e1, go e2 with 
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<>n)
-    | VInt m, VInt n  -> VBool(m<>n)
-    | VBool m, VBool n -> VBool(m<>n)
-    | _ -> failwith "Inequality requires two comparable values")
+    | v1, v2 -> VBool (v1 <> v2))
   
   | Bop (Lt, e1, e2)  -> 
     (match go e1, go e2 with 
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<n)
-    | VInt m, VInt n  -> VBool(m<n)
+    | VInt m, VInt n -> VBool (m < n)
+    | VFloat m, VFloat n -> VBool (m < n)
     | _ -> failwith "Lt requires two comparable values")
   
   | Bop (Lte, e1, e2)  -> 
     (match go e1, go e2 with 
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m<=n)
-    | VInt m, VInt n  -> VBool(m<=n)
+    | VInt m, VInt n -> VBool (m <= n)
+    | VFloat m, VFloat n -> VBool (m <= n)
     | _ -> failwith "Lte requires two comparable values")
 
   | Bop (Gt, e1, e2)  -> 
     (match go e1, go e2 with 
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m>n)
-    | VInt m, VInt n  -> VBool(m>n)
+    | VInt m, VInt n -> VBool (m > n)
+    | VFloat m, VFloat n -> VBool (m > n)
     | _ -> failwith "Gt requires two comparable values")
 
   | Bop (Gte, e1, e2)  -> 
     (match go e1, go e2 with 
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
-    | VFloat m, VFloat n -> VBool(m>=n)
-    | VInt m, VInt n  -> VBool(m>=n)
+    | VInt m, VInt n -> VBool (m >= n)
+    | VFloat m, VFloat n -> VBool (m >= n)
     | _ -> failwith "Gte requires two comparable values")
 
   | Bop (And, e1, e2) -> (
@@ -405,6 +399,7 @@ let rec eval_expr env expr : value =
 
 in
 go expr
+
 
 
 let type_check =
