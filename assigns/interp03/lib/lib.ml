@@ -43,10 +43,10 @@ let sort_uniq cmp lst =
     let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
     apply_subst subst ty
 
-let free_vars_in_env env =
+(* let free_vars_in_env env =
   List.fold_left
     (fun acc (_, Forall (_, t)) -> free_vars t @ acc)
-    [] (Env.to_list env)
+    [] (Env.to_list env) *)
     
 (* Unify Function *)
 let rec unify ty constraints =
@@ -160,20 +160,16 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
       let env = Env.add name (Forall ([], t_val)) env in
       let t_body, c_body = infer env body in
       (t_body, c_val @ c_body)
-    | Let { is_rec = true; name; value; body } ->
-      let fresh = TVar (gensym ()) in
-      let env_with_fresh = Env.add name (Forall ([], fresh)) env in
-      let t_val, c_val = infer env_with_fresh value in
-      let env_free_vars = free_vars_in_env env in
-      let generalized_type =
-        Forall (
-          List.filter (fun v -> not (List.mem v env_free_vars)) (free_vars t_val),
-          t_val
-        )
-      in
-      let env = Env.add name generalized_type env in
-      let t_body, c_body = infer env body in
-      (t_body, c_val @ c_body)
+    | Let { is_rec = true; name; value; body;} ->
+      let fresh1 = TVar (gensym ()) in  
+      let fresh2 = TVar (gensym ()) in  
+      let env_with_f = Env.add name (Forall ([], TFun (fresh1, fresh2))) env in  
+      let _, c_val = infer env_with_f value in
+      let env_with_f_for_body = Env.add name (Forall ([], TFun (fresh1, fresh2))) env in
+      let t_body, c_body = infer env_with_f_for_body body in
+      let c = c_val @ c_body in
+      (t_body, c)
+
     | Assert False -> (TVar (gensym ()), [])
     | Assert e ->
       let t, c = infer env e in
