@@ -43,11 +43,6 @@ let sort_uniq cmp lst =
     let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
     apply_subst subst ty
 
-(* let free_vars_in_env env =
-  List.fold_left
-    (fun acc (_, Forall (_, t)) -> free_vars t @ acc)
-    [] (Env.to_list env) *)
-    
 (* Unify Function *)
 let rec unify ty constraints =
   match constraints with
@@ -115,12 +110,11 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
-            | Eq | Neq ->
-              let fresh = TVar (gensym ()) in
-              (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
-          | Lt | Lte | Gt | Gte ->
-              let fresh = TVar (gensym ()) in
-              (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
+        | Eq | Neq ->
+          let fresh = TVar (gensym ()) in
+          (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
+        | Lt | Lte | Gt | Gte ->
+          (TBool, (t1, t2) :: c1 @ c2) 
         | Cons ->
           let t1, c1 = infer env e1 in
           let t2, c2 = infer env e2 in
@@ -139,7 +133,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         let t1, c1 = infer env e1 in
         let t2, c2 = infer env e2 in
         let t3, c3 = infer env e3 in
-        (t2, (t1, TBool) :: (t2, t3) :: c1 @ c2 @ c3)
+        (t3, (t1, TBool) :: (t2, t3) :: c1 @ c2 @ c3)
     | Fun (x, Some ty, body) ->
         let env = Env.add x (Forall ([], ty)) env in
         let t_body, c_body = infer env body in
@@ -169,7 +163,6 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
       let t_body, c_body = infer env_with_f_for_body body in
       let c = c_val @ c_body in
       (t_body, c)
-
     | Assert False -> (TVar (gensym ()), [])
     | Assert e ->
       let t, c = infer env e in
@@ -224,7 +217,6 @@ let rec eval_expr env expr : value =
   | Var x -> (
         Env.find x env)
   | Fun (x, _, body) -> VClos {name=None; arg = x; body; env}
-
   | App (e1, e2) -> (
         match go e1 with
         | VClos { env; name; arg; body } ->
@@ -237,37 +229,30 @@ let rec eval_expr env expr : value =
           eval_expr env body
         | _ -> failwith "impossible"
       )
-
   | Bop (Add, e1, e2) -> 
       (match go e1, go e2 with
       | VInt m, VInt n -> VInt (m+n)
       | _ -> failwith "impossible")
-
   | Bop (AddF, e1, e2) -> 
         (match go e1, go e2 with
         | VFloat m, VFloat n -> VFloat (m+.n)
         | _ -> failwith "impossible")
-
   | Bop (Sub, e1, e2) -> 
       (match go e1, go e2 with
       | VInt m, VInt n -> VInt (m-n)
       | _ -> failwith "impossible")
-
   | Bop (SubF, e1, e2) -> 
       (match go e1, go e2 with
       | VFloat m, VFloat n -> VFloat (m-.n)
       | _ -> failwith "impossible")
-
   | Bop (Mul, e1, e2) -> 
       (match go e1, go e2 with
       | VInt m, VInt n -> VInt (m*n)
       | _ -> failwith "impossible")
-
   | Bop (MulF, e1, e2) -> 
         (match go e1, go e2 with
         | VFloat m, VFloat n -> VFloat (m*.n)
         | _ -> failwith "impossible")
-
   | Bop (Div, e1, e2) -> 
       (match go e1 with
       | (VInt m) -> (
@@ -277,7 +262,6 @@ let rec eval_expr env expr : value =
           | _ -> failwith ( ("" ))
         )
         | _ -> failwith  ("" )) 
-
   | Bop (DivF, e1, e2) -> 
     (match go e1 with
     | (VFloat m) -> (
@@ -286,18 +270,15 @@ let rec eval_expr env expr : value =
         | _ ->  (failwith ("" ))
       )
       | _ ->  (failwith ("" )) )
-
   | Bop (Mod, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n when n <> 0 -> VInt (m mod n)
       | VInt _, VInt 0 -> failwith "Division by zero in modulo operation"
       | _ -> failwith "Modulo operation requires two numbers")
-
   | Bop (PowF, e1, e2) -> 
         (match go e1, go e2 with
         | VFloat m, VFloat n -> VFloat (m**n)
         | _ -> failwith "impossible")
-
   | Bop (Eq, e1, e2) -> (
     match go e1, go e2 with
     | VClos _, _ | _, VClos _ -> raise CompareFunVals
@@ -310,7 +291,6 @@ let rec eval_expr env expr : value =
     | VSome v1, VSome v2 -> VBool (v1 = v2)
     | VNone, VNone -> VBool true
     | _ -> VBool false)
-      
   | Bop (Neq, e1, e2) -> (
       match go e1, go e2 with
       | VClos _, _ | _, VClos _ -> raise CompareFunVals
@@ -334,7 +314,6 @@ let rec eval_expr env expr : value =
     | VNone, VNone -> VBool false                         
     | _ -> failwith "Lt requires comparable types"
     )
-    
   | Bop (Lte, e1, e2) -> (
       match go e1, go e2 with
       | VInt m, VInt n -> VBool (m <= n)                    
@@ -382,7 +361,6 @@ let rec eval_expr env expr : value =
         | VBool false -> go e2
         | _ -> failwith ( "Logical 'or' requires boolean operands")
   )
-
   | ESome e ->
     let v = eval_expr  env e in
     VSome v
@@ -391,7 +369,6 @@ let rec eval_expr env expr : value =
     | VSome v -> eval_expr (Env.add some_name v env) some_case
     | VNone -> eval_expr env none_case
     | _ -> failwith "Expected an option")
-    
   | If (e1, e2, e3) -> (
         match go e1 with
         | VBool true -> go e2
@@ -402,14 +379,12 @@ let rec eval_expr env expr : value =
       let v1 = go e1 in
       let v2 = go e2 in
       VPair (v1, v2)
-
   | Bop (Cons, e1, e2) -> 
       let v1 = go e1 in
       let v2 = go e2 in
       (match v2 with
       | VList lst -> VList (v1 :: lst)
       | _ -> failwith "Expected a list on the right-hand side of Cons")
-
   | ListMatch { matched; hd_name; tl_name; cons_case; nil_case } -> (
       match go matched with
       | VList (vh :: vt) ->
@@ -419,7 +394,6 @@ let rec eval_expr env expr : value =
       | VList [] -> eval_expr env nil_case 
       | _ -> failwith "Expected a list"
   )
-
   | PairMatch { matched; fst_name; snd_name; case } -> (
       match go matched with
       | VPair (v1, v2) ->
@@ -434,18 +408,15 @@ let rec eval_expr env expr : value =
     (match (v1, v2) with
     | (VList lst1, VList lst2) -> VList (lst1 @ lst2)
     | _ -> failwith "Both operands of Concat must be lists")     
-
   | Assert e1 ->
       (match go e1 with
       | (VBool true) -> VUnit
       | (VBool false) -> raise AssertFail
       | _ -> raise AssertFail)
-
   | Let { is_rec = false; name; value; body } ->
       let v1 = go value in
       let new_env = Env.add name v1 env in
       eval_expr new_env body 
-
   | Let { is_rec = true; name = f; value = e1; body = e2 } ->
         let closure = 
           (match eval_expr env e1  with
@@ -459,7 +430,6 @@ let rec eval_expr env expr : value =
         eval_expr updated_env  e2 
   | Annot (e, _) ->
       eval_expr env e 
-
   in
   go expr
 
