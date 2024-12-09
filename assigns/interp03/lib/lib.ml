@@ -156,11 +156,11 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
       let fresh1 = TVar (gensym ()) in  
       let fresh2 = TVar (gensym ()) in  
       let env_with_f = Env.add name (Forall ([], TFun (fresh1, fresh2))) env in  
-      let _, c_val = infer env_with_f value in
+      let t_val, c_val = infer env_with_f value in
       let env_with_f_for_body = Env.add name (Forall ([], TFun (fresh1, fresh2))) env in
       let t_body, c_body = infer env_with_f_for_body body in
-      let c = c_val @ c_body in
-      (t_body, c)
+      let constraints = c_val @ c_body @ [(t_val, TFun (fresh1, fresh2))] in
+      (t_body, constraints)
     | Assert False -> (TVar (gensym ()), [])
     | Assert e ->
       let t, c = infer env e in
