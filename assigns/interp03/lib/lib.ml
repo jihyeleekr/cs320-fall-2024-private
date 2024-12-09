@@ -110,11 +110,9 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
             (TFloat, (t1, TFloat) :: (t2, TFloat) :: c1 @ c2)
         | And | Or ->
             (TBool, (t1, TBool) :: (t2, TBool) :: c1 @ c2)
-        | Eq | Neq ->
-          let fresh = TVar (gensym ()) in
-          (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
-        | Lt | Lte | Gt | Gte ->
-          (TBool, (t1, t2) :: c1 @ c2) 
+        | Eq | Neq | Lt | Lte | Gt | Gte ->
+            let fresh = TVar (gensym ()) in
+            (TBool, (t1, fresh) :: (t2, fresh) :: c1 @ c2)
         | Cons ->
           let t1, c1 = infer env e1 in
           let t2, c2 = infer env e2 in
@@ -163,10 +161,15 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
       let t_body, c_body = infer env_with_f_for_body body in
       let c = c_val @ c_body in
       (t_body, c)
-    | Assert False -> (TVar (gensym ()), [])
     | Assert e ->
       let t, c = infer env e in
-      (TUnit, (t, TBool) :: c)  
+      if t <> TBool then (
+        print_endline "Type error: Assert condition is not a boolean.";
+        failwith "Type error: Assert condition must be a boolean"
+      ) else (
+        print_endline "Assert condition is a boolean.";
+        (TUnit, c)
+      )
     | Annot (e, ty) ->
         let t, c = infer env e in
         (ty, (t, ty) :: c)
