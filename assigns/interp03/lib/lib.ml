@@ -279,44 +279,50 @@ let rec eval_expr env expr : value =
         | _ -> failwith "impossible")
   | Bop (Eq, e1, e2) -> (
     match go e1, go e2 with
+    | VClos _, _ -> raise CompareFunVals
     | _, VClos _ -> raise CompareFunVals
     | _, _ -> VBool(e1 = e2))
   | Bop (Neq, e1, e2) -> (
       match go e1, go e2 with
+      | VClos _, _ -> raise CompareFunVals
       | _, VClos _ -> raise CompareFunVals
       | _, _ -> VBool(e1 <> e2)
        )
   | Bop (Lt, e1, e2) -> (
     match go e1, go e2 with
+    | VClos _, _ -> raise CompareFunVals
     | _, VClos _ -> raise CompareFunVals
     | _, _ -> VBool(e1 < e2)
     )
   | Bop (Lte, e1, e2) -> (
       match go e1, go e2 with
+    | VClos _, _ -> raise CompareFunVals
     | _, VClos _ -> raise CompareFunVals
     | _, _ -> VBool(e1 <= e2)
   )
   | Bop (Gt, e1, e2) -> (
     match go e1, go e2 with
+    | VClos _, _ -> raise CompareFunVals
     | _, VClos _ -> raise CompareFunVals
     | _, _ -> VBool(e1 > e2)
   )
   | Bop (Gte, e1, e2) -> (
     match go e1, go e2 with
+    | VClos _, _ -> raise CompareFunVals
     | _, VClos _ -> raise CompareFunVals
     | _, _ -> VBool(e1 >= e2)
 )
   | Bop (And, e1, e2) -> (
-      match go e1 with
-      | VBool false -> VBool false
-      | VBool true -> go e2
-      | _ -> failwith ( "Logical 'and' requires boolean operands")
-      )
+    match go e1 with
+    | VBool false -> VBool false
+    | VBool true -> go e2
+    | _ -> failwith ( "Logical 'and' requires boolean operands")
+    )
   | Bop (Or, e1, e2) -> (
-        match go e1 with
-        | VBool true -> VBool true
-        | VBool false -> go e2
-        | _ -> failwith ( "Logical 'or' requires boolean operands")
+      match go e1 with
+      | VBool true -> VBool true
+      | VBool false -> go e2
+      | _ -> failwith ( "Logical 'or' requires boolean operands")
   )
   | ESome e ->
     let v = eval_expr  env e in
