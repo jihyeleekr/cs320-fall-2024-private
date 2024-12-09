@@ -279,73 +279,32 @@ let rec eval_expr env expr : value =
         | _ -> failwith "impossible")
   | Bop (Eq, e1, e2) -> (
     match go e1, go e2 with
-    | VClos _, _ | _, VClos _ -> raise CompareFunVals
-    | VInt m, VInt n -> VBool (m = n)
-    | VFloat m, VFloat n -> VBool (m = n)
-    | VBool m, VBool n -> VBool (m = n)
-    | VUnit, VUnit -> VBool true
-    | VList lst1, VList lst2 -> VBool (lst1 = lst2)
-    | VPair (v1a, v1b), VPair (v2a, v2b) -> VBool (v1a = v2a && v1b = v2b)
-    | VSome v1, VSome v2 -> VBool (v1 = v2)
-    | VNone, VNone -> VBool true
-    | _ -> VBool false)
+    | _, VClos _ -> raise CompareFunVals
+    | _, _ -> VBool(e1 = e2))
   | Bop (Neq, e1, e2) -> (
       match go e1, go e2 with
-      | VClos _, _ | _, VClos _ -> raise CompareFunVals
-      | VInt m, VInt n -> VBool (m <> n)
-      | VFloat m, VFloat n -> VBool (m <> n)
-      | VBool m, VBool n -> VBool (m <> n)
-      | VUnit, VUnit -> VBool false
-      | VList lst1, VList lst2 -> VBool (lst1 <> lst2)
-      | VPair (v1a, v1b), VPair (v2a, v2b) -> VBool (v1a <> v2a || v1b <> v2b)
-      | VSome v1, VSome v2 -> VBool (v1 <> v2)
-      | VNone, VNone -> VBool false
-      | _ -> VBool true)
+      | _, VClos _ -> raise CompareFunVals
+      | _, _ -> VBool(e1 <> e2)
+       )
   | Bop (Lt, e1, e2) -> (
     match go e1, go e2 with
-    | VInt m, VInt n -> VBool (m < n)                     
-    | VFloat m, VFloat n -> VBool (m < n)                 
-    | VBool m, VBool n -> VBool ((not m) && n)            
-    | VList lst1, VList lst2 -> VBool (lst1 < lst2)       
-    | VSome v1, VSome v2 -> VBool (v1 < v2)               
-    | VNone, VSome _ -> VBool true                        
-    | VNone, VNone -> VBool false                         
-    | _ -> failwith "Lt requires comparable types"
+    | _, VClos _ -> raise CompareFunVals
+    | _, _ -> VBool(e1 < e2)
     )
   | Bop (Lte, e1, e2) -> (
       match go e1, go e2 with
-      | VInt m, VInt n -> VBool (m <= n)                    
-      | VFloat m, VFloat n -> VBool (m <= n)                
-      | VBool m, VBool n -> VBool ((not n) || m)            
-      | VList lst1, VList lst2 -> VBool (lst1 <= lst2)      
-      | VSome v1, VSome v2 -> VBool (v1 <= v2)              
-      | VNone, VSome _ -> VBool true                        
-      | VNone, VNone -> VBool true                          
-      | _ -> failwith "Lte requires comparable types"
+    | _, VClos _ -> raise CompareFunVals
+    | _, _ -> VBool(e1 <= e2)
   )
   | Bop (Gt, e1, e2) -> (
     match go e1, go e2 with
-    | VInt m, VInt n -> VBool (m > n)
-    | VFloat m, VFloat n -> VBool (m > n)
-    | VBool m, VBool n -> VBool (m && not n)  
-    | VPair (v1a, v1b), VPair (v2a, v2b) -> VBool ((v1a, v1b) > (v2a, v2b)) 
-    | VSome v1, VSome v2 -> VBool (v1 > v2)
-    | VNone, VSome _ -> VBool false
-    | VNone, VNone -> VBool false
-    | VList lst1, VList lst2 -> VBool (lst1 > lst2) 
-    | _ -> failwith "Gt requires comparable types"
+    | _, VClos _ -> raise CompareFunVals
+    | _, _ -> VBool(e1 > e2)
   )
   | Bop (Gte, e1, e2) -> (
     match go e1, go e2 with
-    | VInt m, VInt n -> VBool (m >= n)                    
-    | VFloat m, VFloat n -> VBool (m >= n)                
-    | VBool m, VBool n -> VBool (m || not n)            
-    | VList lst1, VList lst2 -> VBool (lst1 >= lst2)      
-    | VSome v1, VSome v2 -> VBool (v1 >= v2)              
-    | VSome _, VNone -> VBool true                        
-    | VNone, VNone -> VBool true
-    | VUnit, VUnit -> VBool true  
-    | _ -> failwith "Gte requires comparable types"
+    | _, VClos _ -> raise CompareFunVals
+    | _, _ -> VBool(e1 >= e2)
 )
   | Bop (And, e1, e2) -> (
       match go e1 with
