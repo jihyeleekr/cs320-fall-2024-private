@@ -29,7 +29,7 @@ let rec apply_subst subst ty =
 let apply_subst_to_constraints subst constraints =
   List.map (fun (t1, t2) -> (apply_subst subst t1, apply_subst subst t2)) constraints
 
-(* Custom sort_uniq function *)
+(*sort_uniq function *)
 let sort_uniq cmp lst =
   let sorted = List.sort cmp lst in
   let rec uniq acc = function
@@ -39,9 +39,9 @@ let sort_uniq cmp lst =
   in
   uniq [] sorted
 
-  let instantiate (vars, ty) =
-    let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
-    apply_subst subst ty
+let instantiate (vars, ty) =
+  let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
+  apply_subst subst ty
 
 (* Unify Function *)
 let rec unify ty constraints =
@@ -187,8 +187,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
         :: (t_cons_case, t_nil_case)
         :: c_matched @ c_cons_case @ c_nil_case
       in
-      (t_nil_case, constraints)
-      
+      (t_cons_case, constraints)
   in
   try
     let t, c = infer env e in
