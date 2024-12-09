@@ -10,12 +10,12 @@ let rec occurs x ty =
   | TList t | TOption t -> occurs x t
   | _ -> false
 
-(* let rec free_vars ty =
+let rec free_vars ty =
   match ty with
   | TVar x -> [x]
   | TFun (t1, t2) | TPair (t1, t2) -> free_vars t1 @ free_vars t2
   | TList t | TOption t -> free_vars t
-  | _ -> [] *)
+  | _ -> []
 
 let rec apply_subst subst ty =
   match ty with
@@ -30,14 +30,14 @@ let apply_subst_to_constraints subst constraints =
   List.map (fun (t1, t2) -> (apply_subst subst t1, apply_subst subst t2)) constraints
 
 (*sort_uniq function *)
-(* let sort_uniq cmp lst =
+let sort_uniq cmp lst =
   let sorted = List.sort cmp lst in
   let rec uniq acc = function
     | [] -> List.rev acc
     | [x] -> List.rev (x :: acc)
     | x :: (y :: _ as rest) -> if cmp x y = 0 then uniq acc rest else uniq (x :: acc) rest
   in
-  uniq [] sorted *)
+  uniq [] sorted
 
 let instantiate (vars, ty) =
   let subst = List.map (fun var -> (var, TVar (gensym ()))) vars in
@@ -46,7 +46,9 @@ let instantiate (vars, ty) =
 (* Unify Function *)
 let rec unify ty constraints =
   match constraints with
-  | [] -> None
+  | [] -> 
+    let free = sort_uniq compare (free_vars ty) in
+    Some (Forall (free, ty)) 
   | (t1, t2) :: rest when t1 = t2 -> unify ty rest 
   | (TVar x, t) :: rest | (t, TVar x) :: rest ->
     if occurs x t then None 
@@ -194,6 +196,7 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
     | Some t -> Some t 
     | None -> None
   with _ -> None
+
 
 exception AssertFail
 exception DivByZero
