@@ -279,37 +279,37 @@ let rec eval_expr env expr : value =
         | _ -> failwith "impossible")
   | Bop (Eq, e1, e2) -> (
     match go e1, go e2 with
-    | VClos _, _ -> raise CompareFunVals
-    | _, VClos _ -> raise CompareFunVals
+    | VClos _c1, _ -> raise CompareFunVals
+    | _, VClos _c2 -> raise CompareFunVals
     | _, _ -> VBool(e1 = e2))
   | Bop (Neq, e1, e2) -> (
       match go e1, go e2 with
-      | VClos _, _ -> raise CompareFunVals
-      | _, VClos _ -> raise CompareFunVals
+      | VClos _c1, _ -> raise CompareFunVals
+      | _, VClos _c2 -> raise CompareFunVals
       | _, _ -> VBool(e1 <> e2)
        )
   | Bop (Lt, e1, e2) -> (
     match go e1, go e2 with
-    | VClos _, _ -> raise CompareFunVals
-    | _, VClos _ -> raise CompareFunVals
+    | VClos _c1, _ -> raise CompareFunVals
+    | _, VClos _c2 -> raise CompareFunVals
     | _, _ -> VBool(e1 < e2)
     )
   | Bop (Lte, e1, e2) -> (
       match go e1, go e2 with
-    | VClos _, _ -> raise CompareFunVals
-    | _, VClos _ -> raise CompareFunVals
+    | VClos _c1, _ -> raise CompareFunVals
+    | _, VClos _c2 -> raise CompareFunVals
     | _, _ -> VBool(e1 <= e2)
   )
   | Bop (Gt, e1, e2) -> (
     match go e1, go e2 with
-    | VClos _, _ -> raise CompareFunVals
-    | _, VClos _ -> raise CompareFunVals
+    | VClos _c1, _ -> raise CompareFunVals
+    | _, VClos _c2 -> raise CompareFunVals
     | _, _ -> VBool(e1 > e2)
   )
   | Bop (Gte, e1, e2) -> (
     match go e1, go e2 with
-    | VClos _, _ -> raise CompareFunVals
-    | _, VClos _ -> raise CompareFunVals
+    | VClos _c1, _ -> raise CompareFunVals
+    | _, VClos _c2 -> raise CompareFunVals
     | _, _ -> VBool(e1 >= e2)
 )
   | Bop (And, e1, e2) -> (
