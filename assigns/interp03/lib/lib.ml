@@ -281,36 +281,36 @@ let rec eval_expr env expr : value =
     match go e1, go e2 with
     | VClos _c1, _ -> raise CompareFunVals
     | _, VClos _c2 -> raise CompareFunVals
-    | _, _ -> VBool(e1 = e2))
+    | _, _ -> VBool(go e1 = go e2))
   | Bop (Neq, e1, e2) -> (
       match go e1, go e2 with
       | VClos _c1, _ -> raise CompareFunVals
       | _, VClos _c2 -> raise CompareFunVals
-      | _, _ -> VBool(e1 <> e2)
+      | _, _ -> VBool(go e1 <> go e2)
        )
   | Bop (Lt, e1, e2) -> (
     match go e1, go e2 with
     | VClos _c1, _ -> raise CompareFunVals
     | _, VClos _c2 -> raise CompareFunVals
-    | _, _ -> VBool(e1 < e2)
+    | _, _ -> VBool(go e1 < go e2)
     )
   | Bop (Lte, e1, e2) -> (
       match go e1, go e2 with
     | VClos _c1, _ -> raise CompareFunVals
     | _, VClos _c2 -> raise CompareFunVals
-    | _, _ -> VBool(e1 <= e2)
+    | _, _ -> VBool(go e1 <= go e2)
   )
   | Bop (Gt, e1, e2) -> (
     match go e1, go e2 with
     | VClos _c1, _ -> raise CompareFunVals
     | _, VClos _c2 -> raise CompareFunVals
-    | _, _ -> VBool(e1 > e2)
+    | _, _ -> VBool(go e1 > go e2)
   )
   | Bop (Gte, e1, e2) -> (
     match go e1, go e2 with
     | VClos _c1, _ -> raise CompareFunVals
     | _, VClos _c2 -> raise CompareFunVals
-    | _, _ -> VBool(e1 >= e2)
+    | _, _ -> VBool(go e1 >= go e2)
 )
   | Bop (And, e1, e2) -> (
     match go e1 with
