@@ -161,15 +161,10 @@ let type_of (env : stc_env) (e : expr) : ty_scheme option =
       let t_body, c_body = infer env_with_f_for_body body in
       let c = c_val @ c_body in
       (t_body, c)
+    | Assert False -> (TVar (gensym ()), [])
     | Assert e ->
       let t, c = infer env e in
-      if t <> TBool then (
-        print_endline "Type error: Assert condition is not a boolean.";
-        failwith "Type error: Assert condition must be a boolean"
-      ) else (
-        print_endline "Assert condition is a boolean.";
-        (TUnit, c)
-      )
+      (TUnit, (t, TBool) :: c)  
     | Annot (e, ty) ->
         let t, c = infer env e in
         (ty, (t, ty) :: c)
